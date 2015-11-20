@@ -115,20 +115,32 @@ def _create(parent_i, name, create_as, create_for, isdir):
     node.kind = 0 if isdir else 1
     node.ex = isdir
 
-    # FIXME
-    #
-    # Here, you will need to:
+    # Here, we followed the recommendations.  We did the following:
     #
     #  - store the newly created inode (node.bytes()) on the server
+    ihash = secfs.store.block.store(node.bytes())
+
     #  - map that block to an i owned by the user
+    i = secfs.tables.modmap(create_as, I(create_as), ihash)
+
     #  - if a directory is being created, create entries for . and ..
+    if isdir:
+        new_ihash = secfs.store.tree.add(i, b'.', i)
+        secfs.tables.modmap(create_as, i, new_ihash)
+        new_ihash = secfs.store.tree.add(i, b'..', parent_i)
+        secfs.tables.modmap(create_as, i, new_ihash)
+
     #  - if create_for is a group, you will also have to create a group i for
     #    that group, and point it to the user's i
+    if create_for.is_group():
+        i = secfs.tables.modmap(create_as, I(create_for), i)
+
     #  - call link() to link the new i into the directory at parent_i with the
     #    given name
+    link(create_for, i, parent_i, name)
     #
     # Also make sure that you *return the final i* for the new inode!
-    return I(User(0), 0)
+    return i
 
 def create(parent_i, name, create_as, create_for):
     """
