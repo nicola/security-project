@@ -338,6 +338,7 @@ class SecFS(llfuse.Operations):
             return secfs.tables.resolve(i) != None
 
         if (mode & os.R_OK) == os.R_OK:
+            print("Fuse is calling can_read({}, {})".format(u, i))
             if not secfs.access.can_read(u, i):
                 return False
 
