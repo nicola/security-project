@@ -27,17 +27,22 @@ class VersionStructureList:
         self.current_itables = {}  # principal -> itable.
 
     def lookup_itable(self, principal):
+        print("Lookng up itable for {}".format(principal))
         # Ex1: will get an itable, including downloading a missing itable
         # 1. First it will check if current_itables has it already - quick.
         if principal in self.current_itables:
+            print("Itable was cached: version {}".format(self.current_versions.get(principal, -1)))
             return self.current_itables[principal]
         # 2. Then it will check current_ihandles
         #    if it has it, it will download it and update current_itables.
         if principal in self.current_ihandles:
+            print("Itable ihandle for {} was known: version {}".format(principal, self.current_versions.get(principal, -1)))
             loaded_table = Itable.load(self.current_ihandles[principal])
             self.current_itables[principal] = loaded_table
+            print("Loaded itable for {}; now version {} is: {}".format(principal, self.current_versions.get(principal, -1), loaded_table.mapping))
             return loaded_table
         # 3. Not there either? Return None.
+        print("Could not find itable for {}".format(principal))
         return None
 
     def set_itable(self, update_as, update_for, itable):
@@ -55,10 +60,11 @@ class VersionStructureList:
         # and version_delta is update to note changes
         increment_version(self.current_versions, update_as)
         self.version_delta.add(update_as)
-        print("{} updating itable for {}, now version {}".format(update_as, update_for, self.current_versions[update_as]))
         if update_for != update_as:
+            print("{} updated group itable {}, now user at version {}".format(update_as, update_for, self.current_versions.get(update_as, -1)))
             increment_version(self.current_versions, update_for)
             self.version_delta.add(update_for)
+        print("{} updated own itable now version {}".format(update_as, self.current_versions.get(update_for, -1)))
 
         # 3.5. Update current_itables
         self.current_itables[update_for] = itable
@@ -77,6 +83,7 @@ class VersionStructureList:
         # 6. TODO: signing is done here.
         # 7. TODO: consider performance
         # can any of the above work be delayed until upload?
+        print("Updated itable for {} as {}; now version {} is: {}".format(update_for, update_as, self.current_versions.get(update_for, -1), itable.mapping))
 
 
     def upload(self):
@@ -108,22 +115,23 @@ class VersionStructureList:
 
         # 3. After download, set current_versions to the latest
         # version numbers in each VSL.
-        new_versions = {}
         for uid, vsbytes in changed_vsl.items():
             # TODO: verify that the version is actually newer.
             vs = VersionStructure.from_bytes(vsbytes)
             self.version_structures[User(uid)] = vs
-            for principal, version in vs.version_vector.items():
-                if self.current_versions.get(principal, -1) <= version:
-                    # 4. Latest itable hashes (current_ihandles) are updated.
-                    if principal in vs.ihandles and (vs.ihandles[principal] !=
-                            self.current_ihandles.get(principal, None)):
-                        self.current_ihandles[principal] = \
-                                vs.ihandles[principal]
-                        # 5. If an itable hash is changed
-                        # deleted the old itable from current_itables.
-                        if principal in self.current_itables:
-                            del self.current_itables[principal]
+            print("Downloaded VersionStructure for user {}".format(uid))
+            print("version_vector={}".format(vs.version_vector))
+            print("ihandles={}".format(vs.ihandles))
+            for p, ihandle in vs.ihandles.items():
+                # 4. Latest itable hashes (current_ihandles) are updated.
+                if self.current_versions.get(p, -1) < vs.version_vector[p] and \
+                        ihandle != self.current_ihandles.get(p, None):
+                    self.current_ihandles[p] = ihandle
+                    self.current_versions[p] = vs.version_vector[p]
+                    # 5. If an itable hash is changed
+                    # delete the old itable from current_itables.
+                    if p in self.current_itables:
+                        del self.current_itables[p]
 
 # Ex1: this is the singleton client cache
 vsl = VersionStructureList()
@@ -229,6 +237,7 @@ def resolve(i, resolve_groups = True):
         return None 
 
     if i.n not in t.mapping:
+        print("Itable was this: ", t.mapping, principal, i.n)
         raise LookupError("principal {} does not have i {}".format(principal, i))
 
     # santity checks
