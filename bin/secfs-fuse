@@ -594,17 +594,17 @@ def _getattr(i):
         entry.st_mode = 0
         if n.kind == 0:
             entry.st_mode |= stat.S_IFDIR
-            entry.st_mode |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
         else:
             entry.st_mode |= stat.S_IFREG
 
         # Is it encrypted (i.e. limited read access)?
         if not n.encrypt:
+            # everyone can read
             entry.st_mode |= stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
         else:
             if i.p.is_group():
                 # readable only by group
-                entry.st_mode |= stat.S_IRGRP
+                entry.st_mode |= stat.S_IRUSR | stat.S_IRGRP
             else:
                 # readable only by user
                 entry.st_mode |= stat.S_IRUSR
@@ -624,7 +624,7 @@ def _getattr(i):
             entry.st_gid = 0
 
         # Who can execute? Those who can read if node.ex is True
-        if n.ex:
+        if n.ex or n.kind == 0:
             if entry.st_mode & stat.S_IRUSR:
                 entry.st_mode |= stat.S_IXUSR
             if entry.st_mode & stat.S_IRGRP:
