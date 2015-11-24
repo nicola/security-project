@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import threading
-from secfs.types import Principal, User, Group, VersionStructure
+from secfs.types import Principal, User, Group
 
 seq_lock = threading.Lock()
 
@@ -15,7 +15,7 @@ class SecFSRPC():
 
         # Ex1: a map of version structures (user->vs)
         self.server_vsl = {
-                # User => VersionStructure
+                # User => (version number, VersionStructure-bytes)
         }
 
         self.blocks = {
@@ -24,7 +24,7 @@ class SecFSRPC():
 
     def uploadVSL(self, vsl_delta):
         # Ex1
-        # vsl_delta is a map of User -> VersionStructure.
+        # vsl_delta is a map of User -> (ver, VersionStructure-blob).
         # 1. TODO: do any crypto verification maybe?
         # 2. TODO verify that there is no "going backward in time" maybe
         # 3. TODO reject things if there are security problems.
@@ -37,9 +37,8 @@ class SecFSRPC():
         # vv_cached is a map of User -> version number integer.
         # 1. collect together any users with newer version numbers.
         result = {}
-        for user, vs in self.server_vsl.items():
-            user_version = self.server_vsl[user].version_vector[user]
-            if user not in vv_cached or vv_cached[user] != user_version:
+        for user, (ver, vs) in self.server_vsl.items():
+            if user not in vv_cached or vv_cached[user] != ver:
                 result[user] = vs
         # 2. return all of these as a subset map User -> VersionStructure
         return result

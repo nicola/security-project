@@ -7,7 +7,7 @@
 import pickle
 import secfs.store
 import secfs.fs
-from secfs.types import I, Principal, User, Group, VersionStructure
+from secfs.types import I, Principal, User, Group
 
 # vsl represents the current view of the file system's VSL
 
@@ -53,13 +53,15 @@ class VersionStructureList:
 
         # 3. current_versions get increments for update_as and update_for
         # and version_delta is update to note changes
-        self.current_versions[update_as] = \
-                self.current_versions.get(update_as, 0) + 1
+        increment_version(self.current_versions, update_as)
         self.version_delta.add(update_as)
+        print("{} updating itable for {}, now version {}".format(update_as, update_for, self.current_versions[update_as]))
         if update_for != update_as:
-            self.current_versions[update_for] = \
-                    self.current_versions.get(update_for, 0) + 1
+            increment_version(self.current_versions, update_for)
             self.version_delta.add(update_for)
+
+        # 3.5. Update current_itables
+        self.current_itables[update_for] = itable
 
         # 4. the VS is updated with the new itable hash.
         vs = self.version_structures.get(update_as, None)
@@ -76,27 +78,30 @@ class VersionStructureList:
         # 7. TODO: consider performance
         # can any of the above work be delayed until upload?
 
+
     def upload(self):
         # Ex1: will push a new VSL up to the server.
         # 1. Call the new server RPC "uploadVSL".
         # Could upload diffs based on version_delta.
-        changed_vsl = {
-            user: self.version_structures[user]
-            for user in version_delta if user.is_user()
-        }
+        changed_vsl = {}
+        for user in self.version_delta:
+            if user.is_user():
+                vs = self.version_structures[user]
+                ver = self.current_versions[user]
+                changed_vsl[user.id] = (ver, vs.bytes())
         server.uploadVSL(changed_vsl)
 
         # 2. After upload version_delta is emptied.
-        version_delta.clear()
+        self.version_delta.clear()
 
     def download(self):
         # Ex1: refresh the VSL based on the latest from the server.
         # 1. Call the new server RPC "downloadVSL".
         user_versions = {
-           user: self.current_versions[user]
+           user.id: self.current_versions[user]
            for user in self.current_versions.keys() if user.is_user()
         }
-        changed_vsl = server.downloadVSL(user_versions)
+        changed_vsl = server.downloadVSL({}) # user_versions)
 
         # 2. TODO: verify security properties of the downloaded VSL.
         # No going back in time.
@@ -104,7 +109,10 @@ class VersionStructureList:
         # 3. After download, set current_versions to the latest
         # version numbers in each VSL.
         new_versions = {}
-        for vs in changed_vsl.values():
+        for uid, vsbytes in changed_vsl.items():
+            # TODO: verify that the version is actually newer.
+            vs = VersionStructure.from_bytes(vsbytes)
+            self.version_structures[User(uid)] = vs
             for principal, version in vs.version_vector.items():
                 if self.current_versions.get(principal, -1) <= version:
                     # 4. Latest itable hashes (current_ihandles) are updated.
@@ -145,6 +153,29 @@ def post(push_vs):
         return
     # Ex1: upload updates to the VSL before doing operations
     vsl.upload()
+
+# Ex1: review.  This is an easy-to-pickle type that just has two maps.
+class VersionStructure:
+    def __init__(self):
+        self.ihandles = {
+                # map Principal -> itable hashes
+        }
+        self.version_vector = {
+                # map Principal -> integer versions
+        }
+        # TODO: owner user?  signature?
+
+    def from_bytes(b):
+        # the RPC layer will base64 encode binary data
+        if "data" in b:
+            import base64
+            b = base64.b64decode(b["data"])
+        t = VersionStructure()
+        t.ihandles, t.version_vector = pickle.loads(b)
+        return t
+
+    def bytes(self):
+        return pickle.dumps((self.ihandles, self.version_vector))
 
 class Itable:
     """
@@ -194,6 +225,7 @@ def resolve(i, resolve_groups = True):
     t = vsl.lookup_itable(principal)
     if t is None:
         # User does not yet have an itable
+        print("resolving {} could not find itable for {}".format(i, principal))
         return None 
 
     if i.n not in t.mapping:
@@ -278,6 +310,7 @@ def modmap(mod_as, i, ihash):
         while inumber in t.mapping:
             inumber += 1
         i.allocate(inumber)
+        print("allocated {}".format(i))
     else:
         if i.n not in t.mapping:
             raise IndexError("invalid inumber")
@@ -289,3 +322,6 @@ def modmap(mod_as, i, ihash):
     # Ex1: use vs.set_itable instead of directly changing current_itables
     vsl.set_itable(mod_as, i.p, t)
     return i
+
+def increment_version(vv, key):
+    vv[key] = vv.get(key, 0) + 1

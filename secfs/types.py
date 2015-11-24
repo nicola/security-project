@@ -1,14 +1,3 @@
-# Ex1: review.  This is an easy-to-pickle type that just has two maps.
-class VersionStructure:
-    def __init__(self):
-        self.ihandles = {
-                # map Principal -> itable hashes
-        }
-        self.version_vector = {
-                # map Principal -> integer versions
-        }
-        # TODO: owner user?  signature?
-
 class Principal:
     @property
     def id(self):
