@@ -78,7 +78,8 @@ def pre(refresh, user):
     Called before all user file system operations, right after we have obtained
     an exclusive server lock.
     """
-
+    # Ex1: uncomment
+    # vsl.download()
     if refresh != None:
         # refresh usermap and groupmap
         refresh()
@@ -89,7 +90,8 @@ def post(push_vs):
         # you will probably want to leave this here and
         # put your post() code instead of "pass" below.
         return
-    pass
+    # Ex1: uncomment
+    # vsl.upload()
 
 class Itable:
     """

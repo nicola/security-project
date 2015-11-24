@@ -27,16 +27,22 @@ class SecFSRPC():
         # vsl_delta is a map of User -> VersionStructure.
         # 1. TODO: do any crypto verification maybe?
         # 2. TODO verify that there is no "going backward in time" maybe
-        # 3. reject things if there are security problems.
+        # 3. TODO reject things if there are security problems.
         # 4. Finally update self.server_vsl to reflect the new deltas.
+        self.server_vsl.update(vsl_delta)
         pass
 
     def downloadVSL(self, vv_cached):
         # Ex1
         # vv_cached is a map of User -> version number integer.
         # 1. collect together any users with newer version numbers.
+        result = {}
+        for user, vs in self.server_vsl.items():
+            user_version = self.server_vsl[user].version_vector[user]
+            if user not in vv_cached or vv_cached[user] != user_version:
+                result[user] = vs
         # 2. return all of these as a subset map User -> VersionStructure
-        pass
+        return result
 
     def lock(self):
         # global client lock
