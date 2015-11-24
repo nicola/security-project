@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import threading
+from secfs.types import Principal, User, Group, VersionStructure
+
 seq_lock = threading.Lock()
 
 class SecFSRPC():
@@ -10,10 +12,31 @@ class SecFSRPC():
         #
         # NOTE: All your server state *must* go here.
         #
+
+        # Ex1: a map of version structures (user->vs)
+        self.server_vsl = {
+                # User => VersionStructure
+        }
+
         self.blocks = {
                 # chash => block
         }
 
+    def uploadVSL(self, vsl_delta):
+        # Ex1
+        # vsl_delta is a map of User -> VersionStructure.
+        # 1. TODO: do any crypto verification maybe?
+        # 2. TODO verify that there is no "going backward in time" maybe
+        # 3. reject things if there are security problems.
+        # 4. Finally update self.server_vsl to reflect the new deltas.
+        pass
+
+    def downloadVSL(self, vv_cached):
+        # Ex1
+        # vv_cached is a map of User -> version number integer.
+        # 1. collect together any users with newer version numbers.
+        # 2. return all of these as a subset map User -> VersionStructure
+        pass
 
     def lock(self):
         # global client lock
