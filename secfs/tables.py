@@ -7,65 +7,118 @@
 import pickle
 import secfs.store
 import secfs.fs
-from secfs.types import I, Principal, User, Group
+from secfs.types import I, Principal, User, Group, VersionStructure
 
-# current_itables represents the current view of the file system's itables
-# Ex1: remove this, to be replaced by vsl.
-current_itables = {}
+# vsl represents the current view of the file system's VSL
 
 # Ex1: this is new.
 class VersionStructureList:
     def __init__(self):
-        # Ex1: The latest seen server version vector, with version numbers for all principals.
-        self.vv_srv = {}  # map Principal -> version integer
-        # Ex1: An even newer cached VV, with newer versions with current itable writes.
-        self.vv_delta = {}  # map Principal -> version integer
+        # Ex1: The latest seen server version vector
+        self.current_versions = {}  # map Principal -> version integer
+        # Ex1: Any recent local changes are accumulated
+        self.version_delta = set()  # set of Principals
         # Ex1: All the VS's one for each users, in a map user -> VS.
         self.version_structures = {}  # map Principal -> VersionStructure
-        # Ex1: table of latest itable hashes, in a map
+        # Ex1: table of all the latest itable hashes, in a map
         self.current_ihandles = {}  # map Principal -> hash
         # Ex1: finally include the current_itables cache
-        # current_itables represents the current view of the file system's itables
+        # current_itables represents the current view of the itables
         self.current_itables = {}  # principal -> itable.
 
     def lookup_itable(self, principal):
-        # Ex1: will get an itable, including working to download a missing itable
+        # Ex1: will get an itable, including downloading a missing itable
         # 1. First it will check if current_itables has it already - quick.
-        # 2. Then it will check current_ihandles - if it has it, it will download it and update current_itables.
-        # 3. Not there either?  The principal is new - create it if that's right, or error if not.
-        pass
+        if principal in self.current_itables:
+            return self.current_itables[principal]
+        # 2. Then it will check current_ihandles
+        #    if it has it, it will download it and update current_itables.
+        if principal in self.current_ihandles:
+            loaded_table = Itable.load(self.current_ihandles[principal])
+            self.current_itables[principal] = loaded_table
+            return loaded_table
+        # 3. Not there either? Return None.
+        return None
 
-    def set_itable(update_as, update_for, itable):
+    def set_itable(self, update_as, update_for, itable):
         # Ex1: will also update "as" VS with a new itable.
-        # 1. check "for" could be a group or, if it is a user, same as "as" (just as in _create)
-        # 2. vv_delta gets increments for update_as and update_for, so we know to upload later.
-        # 3. the itable gets saved to the server and hashed.
-        # TODO: do we really want to trust the server hash?  Maybe we always hash too.
+        # 1. check "for" could be a group or, if it is a user, same as "as"
+        if update_as.is_user() and update_as != update_for:
+            raise TypeError("user itable can only be updated by the same user.")
+
+        # 2. the itable gets saved to the server and hashed.
+        new_hash = secfs.store.block.store(itable.bytes())
+        # TODO: do we really want to trust the server hash?
+        # BUG: If the server is adversarial, we should only trust our own hash.
+
+        # 3. current_versions get increments for update_as and update_for
+        # and version_delta is update to note changes
+        self.current_versions[update_as] = \
+                self.current_versions.get(update_as, 0) + 1
+        self.version_delta.add(update_as)
+        if update_for != update_as:
+            self.current_versions[update_for] = \
+                    self.current_versions.get(update_for, 0) + 1
+            self.version_delta.add(update_for)
+
         # 4. the VS is updated with the new itable hash.
-        # 5. the VS is updated with the current vv_srv plus vv_delta.
+        vs = self.version_structures.get(update_as, None)
+        if vs is None:
+            vs = VersionStructure()
+            self.version_structures[update_as] = vs
+        vs.ihandles[update_for] = new_hash
+
+        # 5. the VS is updated with the current current_versions
+        # TODO: consider: any security check needed here?
+        vs.version_vector.update(self.current_versions)
+
         # 6. TODO: signing is done here.
-        # 7. TODO: consider performance - can some of the work be delayed until upload?
-        pass
+        # 7. TODO: consider performance
+        # can any of the above work be delayed until upload?
 
     def upload(self):
         # Ex1: will push a new VSL up to the server.
-        # 1. Call the new server RPC "uploadVSL".  Could upload diffs based on vv_delta.
-        # 2. After upload vv_delta is emptied.
-        pass
+        # 1. Call the new server RPC "uploadVSL".
+        # Could upload diffs based on version_delta.
+        changed_vsl = {
+            user: self.version_structures[user]
+            for user in version_delta if user.is_user()
+        }
+        server.uploadVSL(changed_vsl)
+
+        # 2. After upload version_delta is emptied.
+        version_delta.clear()
 
     def download(self):
         # Ex1: refresh the VSL based on the latest from the server.
-        # 1. Call the new server RPC "downloadVSL".  Could download diffs based on vv_srv.
-        # 2. TODO: verify security properties of the downloaded VSL.  No going back in time.
-        # 3. After download, set vv_srv to the latest version numbers in each VSL.
-        # 4. Latest itable hashes (current_ihandles) are updated.
-        # 5. If an itable hash is changed, the old itable is deleted from current_itables.
-        pass
+        # 1. Call the new server RPC "downloadVSL".
+        user_versions = {
+           user: self.current_versions[user]
+           for user in self.current_versions.keys() if user.is_user()
+        }
+        changed_vsl = server.downloadVSL(user_versions)
 
+        # 2. TODO: verify security properties of the downloaded VSL.
+        # No going back in time.
+
+        # 3. After download, set current_versions to the latest
+        # version numbers in each VSL.
+        new_versions = {}
+        for vs in changed_vsl.values():
+            for principal, version in vs.version_vector.items():
+                if self.current_versions.get(principal, -1) <= version:
+                    # 4. Latest itable hashes (current_ihandles) are updated.
+                    if principal in vs.ihandles and (vs.ihandles[principal] !=
+                            self.current_ihandles.get(principal, None)):
+                        self.current_ihandles[principal] = \
+                                vs.ihandles[principal]
+                        # 5. If an itable hash is changed
+                        # deleted the old itable from current_itables.
+                        if principal in self.current_itables:
+                            del self.current_itables[principal]
 
 # Ex1: this is the singleton client cache
 vsl = VersionStructureList()
-
 
 # a server connection handle is passed to us at mount time by secfs-fuse
 server = None
@@ -78,8 +131,8 @@ def pre(refresh, user):
     Called before all user file system operations, right after we have obtained
     an exclusive server lock.
     """
-    # Ex1: uncomment
-    # vsl.download()
+    # Ex1: download updates to the VSL before doing operations
+    vsl.download()
     if refresh != None:
         # refresh usermap and groupmap
         refresh()
@@ -90,8 +143,8 @@ def post(push_vs):
         # you will probably want to leave this here and
         # put your post() code instead of "pass" below.
         return
-    # Ex1: uncomment
-    # vsl.upload()
+    # Ex1: upload updates to the VSL before doing operations
+    vsl.upload()
 
 class Itable:
     """
@@ -137,14 +190,11 @@ def resolve(i, resolve_groups = True):
         # someone is trying to look up an i that has not yet been allocated
         return None
 
-    global current_itables
-    # Ex1: use vsl.lookup_itable instead
-    if principal not in current_itables:
+    # Ex1: now using vsl.lookup_itable instead of current_itables
+    t = vsl.lookup_itable(principal)
+    if t is None:
         # User does not yet have an itable
         return None 
-
-    # Ex1: use vsl.lookup_itable instead
-    t = current_itables[principal]
 
     if i.n not in t.mapping:
         raise LookupError("principal {} does not have i {}".format(principal, i))
@@ -212,19 +262,15 @@ def modmap(mod_as, i, ihash):
             raise PermissionError("illegal modmap; tried to mod i {0} as {1}".format(i, mod_as))
 
     # find (or create) the principal's itable
-    t = None
-    global current_itables
-    # Ex1: use vsl.lookup_itable instead
-    if i.p not in current_itables:
+    # Ex1: useing vsl.lookup_itable
+    t = vsl.lookup_itable(i.p)
+    if t is None:
         if i.allocated():
             # this was unexpected;
             # user did not have an itable, but an inumber was given
             raise ReferenceError("itable not available")
         t = Itable()
         print("no current list for principal", i.p, "; creating empty table", t.mapping)
-    else:
-        # Ex1: remove
-        t = current_itables[i.p]
 
     # look up (or allocate) the inumber for the i we want to modify
     if not i.allocated():
@@ -240,6 +286,6 @@ def modmap(mod_as, i, ihash):
     if i.p.is_group():
         print("mapping", i.n, "for group", i.p, "into", t.mapping)
     t.mapping[i.n] = ihash # for groups, ihash is an i
-    # Ex1: use vs.set_itable instead
-    current_itables[i.p] = t
+    # Ex1: use vs.set_itable instead of directly changing current_itables
+    vsl.set_itable(mod_as, i.p, t)
     return i
