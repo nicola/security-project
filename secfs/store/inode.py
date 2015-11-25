@@ -7,6 +7,7 @@ class Inode:
         self.size = 0
         self.kind = 0 # 0 is dir, 1 is file
         self.ex = False
+        self.encrypt = False
         self.ctime = 0
         self.mtime = 0
         self.blocks = []
