@@ -43,8 +43,8 @@ class VersionStructureList:
     def set_itable(self, update_as, update_for, itable):
         # Ex1: will also update "as" VS with a new itable.
         # 1. check "for" could be a group or, if it is a user, same as "as"
-        if update_as.is_user() and update_as != update_for:
-            raise TypeError("user itable can only be updated by the same user.")
+        if update_for.is_user() and update_as != update_for:
+            raise TypeError("itable for user {} can not by updated by {}".format(update_for, update_as))
 
         # 2. the itable gets saved to the server and hashed.
         new_hash = secfs.store.block.store(itable.bytes())

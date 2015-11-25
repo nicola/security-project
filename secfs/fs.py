@@ -137,7 +137,7 @@ def _create(parent_i, name, create_as, create_for, isdir):
 
     #  - call link() to link the new i into the directory at parent_i with the
     #    given name
-    link(create_for, i, parent_i, name)
+    link(create_as, i, parent_i, name)
     #
     # Also make sure that you *return the final i* for the new inode!
     return i
