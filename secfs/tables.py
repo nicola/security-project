@@ -8,6 +8,7 @@ import pickle
 import secfs.store
 import secfs.fs
 from secfs.types import I, Principal, User, Group
+import secfs.crypto as crypto
 
 # vsl represents the current view of the file system's VSL
 
@@ -71,10 +72,13 @@ class VersionStructureList:
         vs.ihandles[update_for] = new_hash
 
         # 5. the VS is updated with the current current_versions
-        # TODO: consider: any security check needed here?
+        # TODO: security check needed here.
+        # we should have a secureUpdate function
         vs.version_vector.update(self.current_versions)
 
         # 6. TODO: signing is done here.
+        vs.sign(update_as)
+
         # 7. TODO: consider performance
         # can any of the above work be delayed until upload?
 
@@ -102,6 +106,20 @@ class VersionStructureList:
            for user in self.current_versions.keys() if user.is_user()
         }
         changed_vsl = server.downloadVSL({}) # user_versions)
+
+        # TODO: VERIFY VERIFY VERIFY all of the vs's
+        # loop through all vs's and call verify throw if bad
+        print ("CHANGED VSL: ", changed_vsl)
+        for uid, vsbytes in changed_vsl.items():
+            vs = VersionStructure.from_bytes(vsbytes)
+            user = {}
+            for u in self.current_versions.keys():
+                 if (u.id == uid):
+                     user = u
+            print("USER?? ", user)
+            vs.verify(user)
+            #if not (vs.verify()):
+            #    raise TypeError("Version Structure for user {} not verified", uid)
 
         # 2. TODO: verify security properties of the downloaded VSL.
         # No going back in time.
@@ -164,6 +182,9 @@ class VersionStructure:
                 # map Principal -> integer versions
         }
         # TODO: owner user?  signature?
+        self.signature = {
+               # signature
+        }
 
     def from_bytes(b):
         # the RPC layer will base64 encode binary data
@@ -171,11 +192,19 @@ class VersionStructure:
             import base64
             b = base64.b64decode(b["data"])
         t = VersionStructure()
-        t.ihandles, t.version_vector = pickle.loads(b)
+        t.ihandles, t.version_vector, t.signature = pickle.loads(b)
         return t
 
     def bytes(self):
-        return pickle.dumps((self.ihandles, self.version_vector))
+        return pickle.dumps((self.ihandles, self.version_vector, self.signature))
+
+    def sign(self, user):
+        # updates the signature part of the vs
+        self.signature = crypto.sign(self.bytes(), user)
+
+    def verify(self, user):
+        # verifies a signature
+        return crypto.verify(self.bytes(), self.signature, user)
 
 class Itable:
     """
