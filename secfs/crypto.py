@@ -25,19 +25,6 @@ def sign(obj, user):
     signer.update(obj)
     signature = signer.finalize()
 
-    # TODO: remove from this function once bugs are gone
-    # Why doesn't this verify the signature correctly?
-    public_key = private_key.public_key()
-    verifier = public_key.verifier(
-        signature,
-        padding.PSS(
-            mgf = padding.MGF1(hashes.SHA256()),
-            salt_length = padding.PSS.MAX_LENGTH),
-        hashes.SHA256()
-    )
-    verifier.update(obj)
-    verifier.verify()
-
     return signature
 
 def verify(obj, signature, user):

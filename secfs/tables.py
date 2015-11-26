@@ -76,7 +76,7 @@ class VersionStructureList:
         # we should have a secureUpdate function
         vs.version_vector.update(self.current_versions)
 
-        # 6. TODO: signing is done here.
+        # 6. signing is done here.
         vs.sign(update_as)
 
         # 7. TODO: consider performance
@@ -107,22 +107,19 @@ class VersionStructureList:
         }
         changed_vsl = server.downloadVSL({}) # user_versions)
 
-        # TODO: VERIFY VERIFY VERIFY all of the vs's
+        # 2. TODO: verify security properties of the downloaded VSL.
+        # No going back in time.
+
+        # Verifying all of the vs's
         # loop through all vs's and call verify throw if bad
-        print ("CHANGED VSL: ", changed_vsl)
+        # crypto library throws InvalidSignature exception if verification fails
         for uid, vsbytes in changed_vsl.items():
             vs = VersionStructure.from_bytes(vsbytes)
             user = {}
             for u in self.current_versions.keys():
                  if (u.id == uid):
                      user = u
-            print("USER?? ", user)
             vs.verify(user)
-            #if not (vs.verify()):
-            #    raise TypeError("Version Structure for user {} not verified", uid)
-
-        # 2. TODO: verify security properties of the downloaded VSL.
-        # No going back in time.
 
         # 3. After download, set current_versions to the latest
         # version numbers in each VSL.
