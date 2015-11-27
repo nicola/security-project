@@ -338,6 +338,7 @@ class SecFS(llfuse.Operations):
             return secfs.tables.resolve(i) != None
 
         if (mode & os.R_OK) == os.R_OK:
+            print("Fuse is calling can_read({}, {})".format(u, i))
             if not secfs.access.can_read(u, i):
                 return False
 
@@ -387,7 +388,7 @@ class SecFS(llfuse.Operations):
             encrypt = True
 
         try:
-            i = secfs.fs.mkdir(inodes[parent_inode], name, User(ctx.uid), who)
+            i = secfs.fs.mkdir(inodes[parent_inode], name, User(ctx.uid), who, encrypt)
             return self._post_and_getattr(i)
         except PermissionError as e:
             print("Illegal access:", e)
@@ -416,7 +417,7 @@ class SecFS(llfuse.Operations):
             encrypt = True
 
         try:
-            i = secfs.fs.create(inodes[parent_inode], name, User(ctx.uid), who)
+            i = secfs.fs.create(inodes[parent_inode], name, User(ctx.uid), who, encrypt)
             ret = (new_fh(i, ctx.uid), _getattr(i))
             self._post()
             return ret
@@ -594,12 +595,20 @@ def _getattr(i):
         entry.st_mode = 0
         if n.kind == 0:
             entry.st_mode |= stat.S_IFDIR
-            entry.st_mode |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
         else:
             entry.st_mode |= stat.S_IFREG
 
         # Is it encrypted (i.e. limited read access)?
-        entry.st_mode |= stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        if not n.encrypt:
+            # everyone can read
+            entry.st_mode |= stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        else:
+            if i.p.is_group():
+                # readable only by group
+                entry.st_mode |= stat.S_IRUSR | stat.S_IRGRP
+            else:
+                # readable only by user
+                entry.st_mode |= stat.S_IRUSR
 
         # Who can write (i.e. owned by group or user)?
         if i.p.is_group():
@@ -616,7 +625,7 @@ def _getattr(i):
             entry.st_gid = 0
 
         # Who can execute? Those who can read if node.ex is True
-        if n.ex:
+        if n.ex or n.kind == 0:
             if entry.st_mode & stat.S_IRUSR:
                 entry.st_mode |= stat.S_IXUSR
             if entry.st_mode & stat.S_IRGRP:

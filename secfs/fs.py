@@ -82,13 +82,14 @@ def init(owner, users, groups):
 
     return root_i
 
-def _create(parent_i, name, create_as, create_for, isdir):
+def _create(parent_i, name, create_as, create_for, isdir, encrypt):
     """
     _create allocates a new file, and links it into the directory at parent_i
     with the given name. The new file is owned by create_for, but is created
     using the credentials of create_as. This distinction is necessary as a user
     principal is needed for the final i when creating a file as a group.
     """
+    # TODO: when encrypted, figure out what to do with keys and encryption.
     if not isinstance(parent_i, I):
         raise TypeError("{} is not an I, is a {}".format(parent_i, type(parent_i)))
     if not isinstance(create_as, User):
@@ -98,7 +99,6 @@ def _create(parent_i, name, create_as, create_for, isdir):
 
     assert create_as.is_user() # only users can create
     assert create_as == create_for or create_for.is_group() # create for yourself or for a group
-
     if create_for.is_group() and create_for not in groupmap:
         raise PermissionError("cannot create for unknown group {}".format(create_for))
 
@@ -114,6 +114,7 @@ def _create(parent_i, name, create_as, create_for, isdir):
     node.mtime = node.ctime
     node.kind = 0 if isdir else 1
     node.ex = isdir
+    node.encrypt = encrypt
 
     # Here, we followed the recommendations.  We did the following:
     #
@@ -137,24 +138,24 @@ def _create(parent_i, name, create_as, create_for, isdir):
 
     #  - call link() to link the new i into the directory at parent_i with the
     #    given name
-    link(create_for, i, parent_i, name)
+    link(create_as, i, parent_i, name)
     #
     # Also make sure that you *return the final i* for the new inode!
     return i
 
-def create(parent_i, name, create_as, create_for):
+def create(parent_i, name, create_as, create_for, encrypt):
     """
     Create a new file.
     See secfs.fs._create
     """
-    return _create(parent_i, name, create_as, create_for, False)
+    return _create(parent_i, name, create_as, create_for, False, encrypt)
 
-def mkdir(parent_i, name, create_as, create_for):
+def mkdir(parent_i, name, create_as, create_for, encrypt):
     """
     Create a new directory.
     See secfs.fs._create
     """
-    return _create(parent_i, name, create_as, create_for, True)
+    return _create(parent_i, name, create_as, create_for, True, encrypt)
 
 def read(read_as, i, off, size):
     """
@@ -164,7 +165,7 @@ def read(read_as, i, off, size):
         raise TypeError("{} is not an I, is a {}".format(i, type(i)))
     if not isinstance(read_as, User):
         raise TypeError("{} is not a User, is a {}".format(read_as, type(read_as)))
-
+    print("fs is calling can_read({}, {})".format(read_as, i))
     if not secfs.access.can_read(read_as, i):
         if i.p.is_group():
             raise PermissionError("cannot read from group-readable file {0} as {1}; user is not in group".format(i, read_as))

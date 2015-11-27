@@ -44,8 +44,8 @@ class VersionStructureList:
     def set_itable(self, update_as, update_for, itable):
         # Ex1: will also update "as" VS with a new itable.
         # 1. check "for" could be a group or, if it is a user, same as "as"
-        if update_as.is_user() and update_as != update_for:
-            raise TypeError("user itable can only be updated by the same user.")
+        if update_for.is_user() and update_as != update_for:
+            raise TypeError("itable for user {} can not by updated by {}".format(update_for, update_as))
 
         # 2. the itable gets saved to the server and hashed.
         new_hash = secfs.store.block.store(itable.bytes())
@@ -123,22 +123,23 @@ class VersionStructureList:
 
         # 3. After download, set current_versions to the latest
         # version numbers in each VSL.
-        new_versions = {}
         for uid, vsbytes in changed_vsl.items():
             # TODO: verify that the version is actually newer.
             vs = VersionStructure.from_bytes(vsbytes)
             self.version_structures[User(uid)] = vs
-            for principal, version in vs.version_vector.items():
-                if self.current_versions.get(principal, -1) <= version:
-                    # 4. Latest itable hashes (current_ihandles) are updated.
-                    if principal in vs.ihandles and (vs.ihandles[principal] !=
-                            self.current_ihandles.get(principal, None)):
-                        self.current_ihandles[principal] = \
-                                vs.ihandles[principal]
-                        # 5. If an itable hash is changed
-                        # deleted the old itable from current_itables.
-                        if principal in self.current_itables:
-                            del self.current_itables[principal]
+            print("Downloaded VersionStructure for user {}".format(uid))
+            print("version_vector={}".format(vs.version_vector))
+            print("ihandles={}".format(vs.ihandles))
+            for p, ihandle in vs.ihandles.items():
+                # 4. Latest itable hashes (current_ihandles) are updated.
+                if self.current_versions.get(p, -1) < vs.version_vector[p] and \
+                        ihandle != self.current_ihandles.get(p, None):
+                    self.current_ihandles[p] = ihandle
+                    self.current_versions[p] = vs.version_vector[p]
+                    # 5. If an itable hash is changed
+                    # delete the old itable from current_itables.
+                    if p in self.current_itables:
+                        del self.current_itables[p]
 
 # Ex1: this is the singleton client cache
 vsl = VersionStructureList()
