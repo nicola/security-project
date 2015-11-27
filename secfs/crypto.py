@@ -30,6 +30,7 @@ def sign(obj, user):
 def verify(obj, signature, user):
     """
     Uses the built-in rsa signing verification
+    If verification fails, raises cryptography.exceptions.InvalidSignature
     """
     if signature == {}:
         return False
@@ -42,6 +43,7 @@ def verify(obj, signature, user):
         hashes.SHA256()
     )
     verifier.update(obj)
+    verifier.verify()
     return True
 
 

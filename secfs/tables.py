@@ -195,13 +195,16 @@ class VersionStructure:
     def bytes(self):
         return pickle.dumps((self.ihandles, self.version_vector, self.signature))
 
+    def payload_bytes(self):
+        return pickle.dumps((self.ihandles, self.version_vector))
+
     def sign(self, user):
         # updates the signature part of the vs
-        self.signature = crypto.sign(self.bytes(), user)
+        self.signature = crypto.sign(self.payload_bytes(), user)
 
     def verify(self, user):
         # verifies a signature
-        return crypto.verify(self.bytes(), self.signature, user)
+        return crypto.verify(self.payload_bytes(), self.signature, user)
 
 class Itable:
     """
