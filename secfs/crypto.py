@@ -7,8 +7,45 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.fernet import Fernet
 from secfs.types import I, Principal, User, Group
+import secfs.fs
 
 keys = {}
+
+def sign(obj, user):
+    """
+    Hashes an arbitrary object with and then signs with rsa
+    """
+    private_key = keys[user];
+    signer = private_key.signer(
+        padding.PSS(
+            mgf = padding.MGF1(hashes.SHA256()),
+            salt_length = padding.PSS.MAX_LENGTH),
+        hashes.SHA256()
+    )
+    signer.update(obj)
+    signature = signer.finalize()
+
+    return signature
+
+def verify(obj, signature, user):
+    """
+    Uses the built-in rsa signing verification
+    If verification fails, raises cryptography.exceptions.InvalidSignature
+    """
+    if signature == {}:
+        return False
+    public_key = secfs.fs.usermap[user]
+    verifier = public_key.verifier(
+        signature,
+        padding.PSS(
+            mgf = padding.MGF1(hashes.SHA256()),
+            salt_length = padding.PSS.MAX_LENGTH),
+        hashes.SHA256()
+    )
+    verifier.update(obj)
+    verifier.verify()
+    return True
+
 
 def register_keyfile(user, f):
     """

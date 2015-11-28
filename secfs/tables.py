@@ -8,6 +8,7 @@ import pickle
 import secfs.store
 import secfs.fs
 from secfs.types import I, Principal, User, Group
+import secfs.crypto as crypto
 
 # vsl represents the current view of the file system's VSL
 
@@ -40,6 +41,14 @@ class VersionStructureList:
         # 3. Not there either? Return None.
         return None
 
+    # Returns true if new_versions are all at least old_versions
+    # Makes sure we don't go back in time!
+    def check_versions(old_versions, new_versions):
+        for user in old_versions:
+            if (old_versions[user] > new_versions[user]):
+                raise TypeError("The original vs list is ahead of the new structure list. User {} is at version {} and the new version is {}".format(user.id,old_versions[user], new_versions[user]))
+        return True
+
     def set_itable(self, update_as, update_for, itable):
         # Ex1: will also update "as" VS with a new itable.
         # 1. check "for" could be a group or, if it is a user, same as "as"
@@ -71,13 +80,17 @@ class VersionStructureList:
         vs.ihandles[update_for] = new_hash
 
         # 5. the VS is updated with the current current_versions
-        # TODO: consider: any security check needed here?
+        # security check needed here.
+        # we should have a secureUpdate function
+        
+        VersionStructureList.check_versions(vs.version_vector, self.current_versions)
         vs.version_vector.update(self.current_versions)
 
-        # 6. TODO: signing is done here.
+        # 6. signing is done here.
+        vs.sign(update_as)
+
         # 7. TODO: consider performance
         # can any of the above work be delayed until upload?
-
 
     def upload(self):
         # Ex1: will push a new VSL up to the server.
@@ -103,14 +116,19 @@ class VersionStructureList:
         }
         changed_vsl = server.downloadVSL({}) # user_versions)
 
-        # 2. TODO: verify security properties of the downloaded VSL.
-        # No going back in time.
+        # Verifying all of the vs's
+        # loop through all vs's and call verify throw if bad
+        # crypto library throws InvalidSignature exception if verification fails
+        for uid, vsbytes in changed_vsl.items():
+            vs = VersionStructure.from_bytes(vsbytes)
+            vs.verify(User(uid))
 
         # 3. After download, set current_versions to the latest
         # version numbers in each VSL.
         for uid, vsbytes in changed_vsl.items():
-            # TODO: verify that the version is actually newer.
+            # verify that the version is actually newer.
             vs = VersionStructure.from_bytes(vsbytes)
+            VersionStructureList.check_versions(self.version_structures[User(uid)].version_vector, vs.version_vector)
             self.version_structures[User(uid)] = vs
             print("Downloaded VersionStructure for user {}".format(uid))
             print("version_vector={}".format(vs.version_vector))
@@ -165,6 +183,9 @@ class VersionStructure:
                 # map Principal -> integer versions
         }
         # TODO: owner user?  signature?
+        self.signature = {
+               # signature
+        }
 
     def from_bytes(b):
         # the RPC layer will base64 encode binary data
@@ -172,11 +193,22 @@ class VersionStructure:
             import base64
             b = base64.b64decode(b["data"])
         t = VersionStructure()
-        t.ihandles, t.version_vector = pickle.loads(b)
+        t.ihandles, t.version_vector, t.signature = pickle.loads(b)
         return t
 
     def bytes(self):
+        return pickle.dumps((self.ihandles, self.version_vector, self.signature))
+
+    def payload_bytes(self):
         return pickle.dumps((self.ihandles, self.version_vector))
+
+    def sign(self, user):
+        # updates the signature part of the vs
+        self.signature = crypto.sign(self.payload_bytes(), user)
+
+    def verify(self, user):
+        # verifies a signature
+        return crypto.verify(self.payload_bytes(), self.signature, user)
 
 class Itable:
     """
