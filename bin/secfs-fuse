@@ -537,6 +537,7 @@ def _reload_principals():
     Reloads the set of known principals by reading and parsing /.users and
     /.groups, and the repopulating secfs.fs.usermap and secfs.fs.groupmap.
     """
+    print("Entering _reload_principals")
     def _read_file(fname):
         """
         Simple helper function for reading the pickled contents of a SecFS file
@@ -558,6 +559,7 @@ def _reload_principals():
     secfs.fs.usermap = {}
     for p, pem in _read_file(b".users").items():
         secfs.fs.usermap[p] = load_pem_public_key(pem, backend=default_backend())
+    print("Exiting _reload_principals")
 
 def _getattr(i):
     """

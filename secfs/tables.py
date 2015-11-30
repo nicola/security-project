@@ -107,7 +107,33 @@ class VersionStructureList:
         # 2. After upload version_delta is emptied.
         self.version_delta.clear()
 
-    def download(self):
+    def apply_and_check_vs(self, uid, vs):
+        # If the are are no version structures, we apply the root one and
+        # just rollback if things look bad
+        print("In apply_and_check_vs, uid is", uid,
+              "and current version_structures is: ", self.version_structures)
+        user = User(uid)
+        if user in self.version_structures:
+            previous_versions = self.version_structures[user].version_vector
+            VersionStructureList.check_versions(
+                previous_versions, vs.version_vector)
+        # verify that the version is actually newer.
+        self.version_structures[User(uid)] = vs
+        print("Downloaded VersionStructure for user {}".format(uid))
+        print("version_vector={}".format(vs.version_vector))
+        print("ihandles={}".format(vs.ihandles))
+        for p, ihandle in vs.ihandles.items():
+            # 4. Latest itable hashes (current_ihandles) are updated.
+            if self.current_versions.get(p, -1) < vs.version_vector[p] and \
+                    ihandle != self.current_ihandles.get(p, None):
+                self.current_ihandles[p] = ihandle
+                self.current_versions[p] = vs.version_vector[p]
+                # 5. If an itable hash is changed
+                # delete the old itable from current_itables.
+                if p in self.current_itables:
+                    del self.current_itables[p]
+
+    def download(self, refresh):
         # Ex1: refresh the VSL based on the latest from the server.
         # 1. Call the new server RPC "downloadVSL".
         user_versions = {
@@ -115,6 +141,18 @@ class VersionStructureList:
            for user in self.current_versions.keys() if user.is_user()
         }
         changed_vsl = server.downloadVSL({}) # user_versions)
+
+        # Do root's VSL first, so we can refresh .users and .groups
+        # before checking everybody else
+        if 0 in changed_vsl:
+            vsbytes = changed_vsl[0]
+            vs = VersionStructure.from_bytes(vsbytes)
+            vs.verify(User(0))
+            self.apply_and_check_vs(0, vs)
+
+        # refresh usermap and groupmap
+        if refresh:
+            refresh()
 
         # Verifying all of the vs's
         # loop through all vs's and call verify throw if bad
@@ -126,23 +164,9 @@ class VersionStructureList:
         # 3. After download, set current_versions to the latest
         # version numbers in each VSL.
         for uid, vsbytes in changed_vsl.items():
-            # verify that the version is actually newer.
-            vs = VersionStructure.from_bytes(vsbytes)
-            VersionStructureList.check_versions(self.version_structures[User(uid)].version_vector, vs.version_vector)
-            self.version_structures[User(uid)] = vs
-            print("Downloaded VersionStructure for user {}".format(uid))
-            print("version_vector={}".format(vs.version_vector))
-            print("ihandles={}".format(vs.ihandles))
-            for p, ihandle in vs.ihandles.items():
-                # 4. Latest itable hashes (current_ihandles) are updated.
-                if self.current_versions.get(p, -1) < vs.version_vector[p] and \
-                        ihandle != self.current_ihandles.get(p, None):
-                    self.current_ihandles[p] = ihandle
-                    self.current_versions[p] = vs.version_vector[p]
-                    # 5. If an itable hash is changed
-                    # delete the old itable from current_itables.
-                    if p in self.current_itables:
-                        del self.current_itables[p]
+            if uid != 0:
+                 vs = VersionStructure.from_bytes(vsbytes)
+                 self.apply_and_check_vs(uid, vs)
 
 # Ex1: this is the singleton client cache
 vsl = VersionStructureList()
@@ -159,10 +183,7 @@ def pre(refresh, user):
     an exclusive server lock.
     """
     # Ex1: download updates to the VSL before doing operations
-    vsl.download()
-    if refresh != None:
-        # refresh usermap and groupmap
-        refresh()
+    vsl.download(refresh)
 
 def post(push_vs):
     if not push_vs:
