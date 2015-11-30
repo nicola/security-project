@@ -8,8 +8,8 @@ import secfs.store.block
 from secfs.store.inode import Inode
 from secfs.types import I, Principal, User, Group
 
-# Ex3: add read_as
-def find_under(dir_i, name):
+# Ex3-note: read_as to decrypt the directory if needed.
+def find_under(read_as, dir_i, name):
     """
     Attempts to find the i of the file or directory with the given name under
     the directory at i.
@@ -17,8 +17,8 @@ def find_under(dir_i, name):
     if not isinstance(dir_i, I):
         raise TypeError("{} is not an I, is a {}".format(dir_i, type(dir_i)))
 
-    # Ex3: add read_as
-    dr = Directory(dir_i)
+    # Ex3-note: read_as to decrypt the directory if needed
+    dr = Directory(dir_i, read_as)
     for f in dr.children:
         if f[0] == name:
             return f[1]
@@ -29,8 +29,8 @@ class Directory:
     A Directory is used to marshal and unmarshal the contents of directory
     inodes. To load a directory, an i must be given.
     """
-    # Ex3: add read_as argument.
-    def __init__(self, i):
+    # Ex3-note: read_as is used to decrypt the directory if needed.
+    def __init__(self, i, read_as):
         if not isinstance(i, I):
             raise TypeError("{} is not an I, is a {}".format(i, type(i)))
 
@@ -40,16 +40,16 @@ class Directory:
         self.inode = secfs.fs.get_inode(i)
         if self.inode.kind != 0:
             raise TypeError("inode with ihash {} is not a directory".format(ihash))
-        # Ex3: add read_as argument
-        cnt = self.inode.read()
+        # Ex3-note: add read_as argument
+        cnt = self.inode.read(read_as)
         if len(cnt) != 0:
             self.children = pickle.loads(cnt)
 
     def bytes(self):
         return pickle.dumps(self.children)
 
-# Ex3: add add_as argument
-def add(dir_i, name, i):
+# Ex3-note: add_as is used to decrypt the existing directory if needed.
+def add(add_as, dir_i, name, i):
     """
     Updates the directory's inode contents to include an entry for i under the
     given name.
@@ -59,16 +59,14 @@ def add(dir_i, name, i):
     if not isinstance(i, I):
         raise TypeError("{} is not an I, is a {}".format(i, type(i)))
 
-    # Ex3: add read_as
-    dr = Directory(dir_i)
+    # Ex3-note: add_as is used to decrypt the directory if needed.
+    dr = Directory(dir_i, add_as)
     for f in dr.children:
         if f[0] == name:
             raise KeyError("asked to add i {} to dir {} under name {}, but name already exists".format(i, dir_i, name))
 
     dr.children.append((name, i))
-    new_dhash = secfs.store.block.store(dr.bytes())
-    # Ex3: instead of setting inode.blocks directly, use
-    # inode.clear() and inode.write(add_as...)
-    dr.inode.blocks = [new_dhash]
+    # Ex3-note: instead of setting inode.blocks directly, use node.write
+    dr.inode.write(add_as, dr.bytes())
     new_ihash = secfs.store.block.store(dr.inode.bytes())
     return new_ihash
