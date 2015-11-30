@@ -87,7 +87,9 @@ class Inode:
             secret = uuid.uuid4() 
             #    3b. fetch all the public keys for self.encryptfor (group or user)
             # TODO: can I just read the people in the readkey?
-            users = self.readkey.keys() 
+            # TODO: the answer is NO, since when I create the file there are no readkeys!
+            # TODO: Retrieve the users in the grou
+            users = []
             for user in users:
                 #    3c. encrypt the symmetric key with each of the public keys
                 #    3d. store self.readkey, and return the symmetric key
