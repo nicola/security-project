@@ -117,7 +117,10 @@ def _create(parent_i, name, create_as, create_for, isdir, encrypt):
     node.kind = 0 if isdir else 1
     node.ex = isdir
     # Ex3-note: set node.encryptfor = create_for instead
-    node.encryptfor = create_for if encrypt else None
+    if encrypt:
+        node.encryptfor = create_for
+    else:
+        node.encryptfor = None
 
     # Here, we followed the recommendations.  We did the following:
     #
