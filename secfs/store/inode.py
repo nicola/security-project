@@ -32,9 +32,9 @@ class Inode:
         """
         Reads the block content of this inode.
         """
-
         savedbytes = b"".join([secfs.store.block.load(b) for b in self.blocks])
-        if self.encryptfor:
+        # TODO: Check if file exists
+        if len(savedbytes) > 0 and self.encryptfor:
             # Ex3:
             # 1. Get the bulk key for decrypting.
             #    1a. fail (return None) if read_as is not in the readkey map.
@@ -88,15 +88,16 @@ class Inode:
             #    3b. fetch all the public keys for self.encryptfor (group or user)
             # TODO: can I just read the people in the readkey?
             # TODO: the answer is NO, since when I create the file there are no readkeys!
-            # TODO: Retrieve the users in the grou
-            users = []
-            for user in users:
-                #    3c. encrypt the symmetric key with each of the public keys
-                #    3d. store self.readkey, and return the symmetric key
-                self.readkey[user] = secfs.crypto.encrypt(user, secret)
+            # TODO: Retrieve the users in the group
+            if write_as.is_group():
+                users = secfs.fs.groupmap[write_as]
+                for user in users:
+                    #    3c. encrypt the symmetric key with each of the public keys
+                    #    3d. store self.readkey, and return the symmetric key
+                    self.readkey[user] = secfs.crypto.encrypt(user, secret)
             # 4. Bulk encrypt and store as self.blocks
             # TODO: encrypt_sym should probably be of the type b"string"
-            savedbytes = secfs.crypto.encrypt_sym(readkey, filebytes)
+            savedbytes = secfs.crypto.encrypt_sym(secret, filebytes)
 
         self.blocks = [secfs.store.block.store(savedbytes)]
 
