@@ -39,11 +39,14 @@ class Inode:
             # 1. Get the bulk key for decrypting.
             #    1a. fail (return None) if read_as is not in the readkey map.
             # TODO: check if the dictionary has this type of objects as keys
+            print("Inode is encrypted, {} is trying to read".format(read_as))
             if read_as not in self.readkey:
+                print("Oh no, {} is not in readkey {}".format(read_as, self.readkey))
                 return None
             #    1b. use my private key for decrypting the bulk key.
             # TODO: check if this throws an exception
             readkey = secfs.crypto.decrypt(read_as, self.readkey[read_as])
+            print("User {} has found the secret {}".format(read_as, readkey))
             #    1c. fail (return None) if that decryption fails.
             # 2. If the key is None, return the raw bytes
             if not readkey:
