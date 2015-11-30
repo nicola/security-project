@@ -13,6 +13,7 @@ def can_read(user, i):
         return True
 
     n = secfs.fs.get_inode(i)
+    # Ex3: switch to n.encryptfor, strip out the "prints" from this file.
     if not n.encrypt:
         print("n.encrypt was False, so returning True")
         return True

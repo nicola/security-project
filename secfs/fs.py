@@ -54,8 +54,10 @@ def init(owner, users, groups):
     if root_i == None:
         raise RuntimeError
 
+    # Ex3: Send owner to tree.add
     new_ihash = secfs.store.tree.add(root_i, b'.', root_i)
     secfs.tables.modmap(owner, root_i, new_ihash)
+    # Ex3: Send owner to tree.add
     new_ihash = secfs.store.tree.add(root_i, b'..', root_i)
     secfs.tables.modmap(owner, root_i, new_ihash)
     print("CREATED ROOT AT", new_ihash)
@@ -74,6 +76,8 @@ def init(owner, users, groups):
         node.size = len(bts)
         node.mtime = node.ctime
         node.ctime = time.time()
+        # Ex3: use write(owner) to write thes bytes intead of touching
+        # blocks directly.
         node.blocks = [secfs.store.block.store(bts)]
 
         ihash = secfs.store.block.store(node.bytes())
@@ -114,6 +118,7 @@ def _create(parent_i, name, create_as, create_for, isdir, encrypt):
     node.mtime = node.ctime
     node.kind = 0 if isdir else 1
     node.ex = isdir
+    # Ex3: set node.encryptfor = create_for instead
     node.encrypt = encrypt
 
     # Here, we followed the recommendations.  We did the following:
@@ -126,8 +131,10 @@ def _create(parent_i, name, create_as, create_for, isdir, encrypt):
 
     #  - if a directory is being created, create entries for . and ..
     if isdir:
+        # Ex3: Send create_as to tree.add
         new_ihash = secfs.store.tree.add(i, b'.', i)
         secfs.tables.modmap(create_as, i, new_ihash)
+        # Ex3: Send create_as to tree.add
         new_ihash = secfs.store.tree.add(i, b'..', parent_i)
         secfs.tables.modmap(create_as, i, new_ihash)
 
@@ -172,6 +179,7 @@ def read(read_as, i, off, size):
         else:
             raise PermissionError("cannot read from user-readable file {0} as {1}".format(i, read_as))
 
+    # Ex3: add read_as
     return get_inode(i).read()[off:off+size]
 
 def write(write_as, i, off, buf):
@@ -192,6 +200,7 @@ def write(write_as, i, off, buf):
     node = get_inode(i)
 
     # TODO: this is obviously stupid -- should not get rid of blocks that haven't changed
+    # Ex3: pass write_as for read_as
     bts = node.read()
 
     # write also allows us to extend a file
@@ -201,6 +210,7 @@ def write(write_as, i, off, buf):
         bts = bts[:off] + buf + bts[off+len(buf):]
 
     # update the inode
+    # Ex3: use node.clear() / node.write(write_as) to write these bytes
     node.blocks = [secfs.store.block.store(bts)]
     node.mtime = time.time()
     node.size = len(bts)
@@ -211,12 +221,14 @@ def write(write_as, i, off, buf):
 
     return len(buf)
 
+# Ex3: add read_as
 def readdir(i, off):
     """
     Return a list of is in the directory at i.
     Each returned list item is a tuple of an i and an index. The index can be
     used to request a suffix of the list at a later time.
     """
+    # Ex3: add read_as
     dr = Directory(i)
     if dr == None:
         return None
@@ -239,5 +251,6 @@ def link(link_as, i, parent_i, name):
         else:
             raise PermissionError("cannot create in user-writeable directory {0} as {1}".format(parent_i, link_as))
 
+    # Ex3: Send link_as to tree.add
     parent_ihash = secfs.store.tree.add(parent_i, name, i)
     secfs.tables.modmap(link_as, parent_i, parent_ihash)

@@ -8,6 +8,7 @@ import secfs.store.block
 from secfs.store.inode import Inode
 from secfs.types import I, Principal, User, Group
 
+# Ex3: add read_as
 def find_under(dir_i, name):
     """
     Attempts to find the i of the file or directory with the given name under
@@ -16,6 +17,7 @@ def find_under(dir_i, name):
     if not isinstance(dir_i, I):
         raise TypeError("{} is not an I, is a {}".format(dir_i, type(dir_i)))
 
+    # Ex3: add read_as
     dr = Directory(dir_i)
     for f in dr.children:
         if f[0] == name:
@@ -27,6 +29,7 @@ class Directory:
     A Directory is used to marshal and unmarshal the contents of directory
     inodes. To load a directory, an i must be given.
     """
+    # Ex3: add read_as argument.
     def __init__(self, i):
         if not isinstance(i, I):
             raise TypeError("{} is not an I, is a {}".format(i, type(i)))
@@ -37,7 +40,7 @@ class Directory:
         self.inode = secfs.fs.get_inode(i)
         if self.inode.kind != 0:
             raise TypeError("inode with ihash {} is not a directory".format(ihash))
-
+        # Ex3: add read_as argument
         cnt = self.inode.read()
         if len(cnt) != 0:
             self.children = pickle.loads(cnt)
@@ -45,6 +48,7 @@ class Directory:
     def bytes(self):
         return pickle.dumps(self.children)
 
+# Ex3: add add_as argument
 def add(dir_i, name, i):
     """
     Updates the directory's inode contents to include an entry for i under the
@@ -55,6 +59,7 @@ def add(dir_i, name, i):
     if not isinstance(i, I):
         raise TypeError("{} is not an I, is a {}".format(i, type(i)))
 
+    # Ex3: add read_as
     dr = Directory(dir_i)
     for f in dr.children:
         if f[0] == name:
@@ -62,6 +67,8 @@ def add(dir_i, name, i):
 
     dr.children.append((name, i))
     new_dhash = secfs.store.block.store(dr.bytes())
+    # Ex3: instead of setting inode.blocks directly, use
+    # inode.clear() and inode.write(add_as...)
     dr.inode.blocks = [new_dhash]
     new_ihash = secfs.store.block.store(dr.inode.bytes())
     return new_ihash
