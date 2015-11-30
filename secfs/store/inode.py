@@ -9,7 +9,7 @@ class Inode:
         self.ex = False
         # Ex3-note: encryptfor is the user/group for whom we encrypt.
         self.encryptfor = None
-        self.readkey = None # Ex3: map uid -> encrypted symmetric key
+        self.readkey = dict() # Ex3: map uid -> encrypted symmetric key
         self.ctime = 0
         self.mtime = 0
         self.blocks = []
@@ -31,17 +31,25 @@ class Inode:
         """
         Reads the block content of this inode.
         """
-        # Ex3:
-        # 1. Get the bulk key for decrypting.
-        #    1a. fail (return None) if read_as is not in the readkey map.
-        #    1b. fetch my own private key.
-        #    1c. use my private key for decrypting the bulk key.
-        #    1d. fail (return None) if that decryption fails.
-        # 2. If the key is None, return the raw bytes
-        # 3. If the key is not None, use it to decrypt the bytes
-        savedbytes = b"".join([secfs.store.block.load(b) for b in self.blocks])
+
+       savedbytes = b"".join([secfs.store.block.load(b) for b in self.blocks])
         if self.encryptfor:
-            return savedbytes[::-1]  # super-secure pig-latin encryption
+            # Ex3:
+            # 1. Get the bulk key for decrypting.
+            #    1a. fail (return None) if read_as is not in the readkey map.
+            # TODO: check if the dictionary has this type of objects as keys
+            if read_as not in self.readkey:
+                return None
+            #    1b. use my private key for decrypting the bulk key.
+            # TODO: check if this throws any error
+            readkey = secfs.crypto.decrypt(read_as, self.readkey[read_as])
+            #    1c. fail (return None) if that decryption fails.
+            # 2. If the key is None, return the raw bytes
+            if not readkey:
+                return savedbytes
+            # 3. If the key is not None, use it to decrypt the bytes
+            return secfs.crypto.decrypt_sym(readkey, savedbytes) 
+
         return savedbytes
 
     # Ex3: instead of manipulating blocks directly, use this to
