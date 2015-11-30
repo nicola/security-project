@@ -338,82 +338,86 @@ sudo rm -f root.pub user-*-key.pem
 client
 
 
-section "Initializtion"
-expect "ls -la" ' *\.\/?$' || printf "${FAIL}: root directory does not contain .\n"
-expect "ls -la" ' *\.\.\/?$' || printf "${FAIL}: root directory does not contain ..\n"
-expect "ls -la" ' *\.users$' || printf "${FAIL}: root directory does not contain .users\n"
-expect "ls -la" ' *\.groups$' || printf "${FAIL}: root directory does not contain .groups\n"
-fstats "." "uid=root" "perm=drwxr-xr-x" || printf "${FAIL}: root directory . has incorrect permissions\n"
-fstats ".users" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: /.users has incorrect permissions\n"
-fstats ".groups" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: /.groups has incorrect permissions\n"
-expect "cat .users" '.+' || printf "${FAIL}: .users couldn't be read\n"
-expect "cat .groups" '.+' || printf "${FAIL}: .groups couldn't be read\n"
-
-
-section "Manipulating the root directory"
-# root single-user write
-expect "echo x | sudo tee root-file" "sudo cat root-file" '^x$' || printf "${FAIL}: couldn't read back root created file\n"
-expect "echo x | sudo tee -a root-file" "sudo cat root-file" '^x\nx$' || printf "${FAIL}: couldn't read back root appended file\n"
-
-cant "create user file in root dir" "echo b | tee user-file" "cat user-file"
-cant "append to root file as user" "echo b | tee -a root-file" "pcregrep -M '^x\nb$ root-file"
-cant "make user directory in root dir" "mkdir user-only" "stat user-only"
-fstats "root-file" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: new root file has incorrect permissions\n"
-
-# root single-user dir
-expect "sudo mkdir root-only" '^$' || printf "${FAIL}: couldn't make root directory\n"
-expect "sudo ls -la root-only" ' *\.\/?$' || printf "${FAIL}: new root directories don't have .\n"
-expect "sudo ls -la root-only" ' *\.\.\/?$' || printf "${FAIL}: new root directories don't have ..\n"
-expect "sudo ls -la root-only/.." ' *\.users$' || printf "${FAIL}: new root directory .. doesn't point to root\n"
-expect "echo a | sudo tee root-only/file" "sudo cat root-only/file" '^a$' || printf "${FAIL}: couldn't read back root created file in directory\n"
-expect "echo a | sudo tee -a root-only/file" "sudo cat root-only/file" '^a\na$' || printf "${FAIL}: couldn't read back root appended file in directory\n"
-expect "sudo ls -la root-only/." ' *file$' || printf "${FAIL}: new root directory . does not point to self\n"
-
-cant "create file in dir owned by other user" "echo b | tee root-only/user-file" "cat root-only/user-file"
-cant "append to file owned by other user" "echo b | tee -a root-only/file" "pcregrep -M '^a\nb$ root-only/file"
-cant "make directory in dir owned by other user" "mkdir root-only/user-only" "stat root-only/user-only"
-fstats "root-only" "uid=root" "perm=drwxr-xr-x" || printf "${FAIL}: new root dir has incorrect permissions\n"
-fstats "root-only/file" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: new nested root file has incorrect permissions\n"
-
-
-section "Manipulating shared directories"
-# shared directory mkdir
-expect "sudo sh -c 'umask 0200; sg users \"mkdir shared\"'" '^$' || printf "${FAIL}: couldn't create group-owned directory\n"
-expect "sudo ls -la shared/.." ' *\.users/?$' || printf "${FAIL}: new shared directory .. doesn't point to root\n"
-fstats "shared" "uid=root" "gid=users" "perm=dr-xrwxr-x" || printf "${FAIL}: new shared dir has incorrect permissions\n"
-
-# user file in shared dir
-user=$(id -un)
-expect "echo b | tee shared/user-file" "cat shared/user-file" '^b$' || printf "${FAIL}: couldn't create user file in shared directory\n"
-expect "echo b | tee -a shared/user-file" "cat shared/user-file" '^b\nb$' || printf "${FAIL}: couldn't appended to user file in shared directory\n"
-fstats "shared/user-file" "uid=$user" "perm=-rw-r--r--" || printf "${FAIL}: new user file has incorrect permissions\n"
-cant "append to file owned by other user as root" "echo x | sudo tee -a shared/user-file" "pcregrep -M '^b\nx$ shared/user-file"
-
-
-section "Manipulating non-owner directories"
-# user dir in shared dir
-expect "mkdir shared/user-only" '^$' || printf "${FAIL}: couldn't make user directory in shared dir\n"
-expect "ls -la shared/user-only" ' *\.\/?$' || printf "${FAIL}: new user directories don't have .\n"
-expect "ls -la shared/user-only" ' *\.\.\/?$' || printf "${FAIL}: new user directories don't have ..\n"
-expect "ls -la shared/user-only/.." ' *user-only/?$' || printf "${FAIL}: new user directory .. doesn't point to parent\n"
-expect "echo c | tee shared/user-only/file" "cat shared/user-only/file" '^c$' || printf "${FAIL}: couldn't read back user created file\n"
-expect "echo c | tee -a shared/user-only/file" "cat shared/user-only/file" '^c\nc$' || printf "${FAIL}: couldn't read back user appended file\n"
-expect "ls -la shared/user-only/." ' *file$' || printf "${FAIL}: new user directory . does not point to self\n"
-
-cant "create file in dir owned by other user as root" "echo b | sudo tee shared/user-only/root-file" "cat shared/user-only/root-file"
-cant "append to file owned by other user as root" "echo x | sudo tee -a shared/user-only/file" "pcregrep -M '^c\nx$ shared/user-only/file"
-cant "make directory in dir owned by other user as root" "sudo mkdir shared/user-only/root-dir" "stat shared/user-only/root-dir"
-fstats "shared/user-only" "uid=$user" "perm=drwxr-xr-x" || printf "${FAIL}: new user dir has incorrect permissions\n"
-fstats "shared/user-only/file" "uid=$user" "perm=-rw-r--r--" || printf "${FAIL}: new nested user file has incorrect permissions\n"
-
-
+#section "Initializtion"
+#expect "ls -la" ' *\.\/?$' || printf "${FAIL}: root directory does not contain .\n"
+#expect "ls -la" ' *\.\.\/?$' || printf "${FAIL}: root directory does not contain ..\n"
+#expect "ls -la" ' *\.users$' || printf "${FAIL}: root directory does not contain .users\n"
+#expect "ls -la" ' *\.groups$' || printf "${FAIL}: root directory does not contain .groups\n"
+#fstats "." "uid=root" "perm=drwxr-xr-x" || printf "${FAIL}: root directory . has incorrect permissions\n"
+#fstats ".users" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: /.users has incorrect permissions\n"
+#fstats ".groups" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: /.groups has incorrect permissions\n"
+#expect "cat .users" '.+' || printf "${FAIL}: .users couldn't be read\n"
+#expect "cat .groups" '.+' || printf "${FAIL}: .groups couldn't be read\n"
+#
+#
+#section "Manipulating the root directory"
+## root single-user write
+#expect "echo x | sudo tee root-file" "sudo cat root-file" '^x$' || printf "${FAIL}: couldn't read back root created file\n"
+#expect "echo x | sudo tee -a root-file" "sudo cat root-file" '^x\nx$' || printf "${FAIL}: couldn't read back root appended file\n"
+#
+#cant "create user file in root dir" "echo b | tee user-file" "cat user-file"
+#cant "append to root file as user" "echo b | tee -a root-file" "pcregrep -M '^x\nb$ root-file"
+#cant "make user directory in root dir" "mkdir user-only" "stat user-only"
+#fstats "root-file" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: new root file has incorrect permissions\n"
+#
+## root single-user dir
+#expect "sudo mkdir root-only" '^$' || printf "${FAIL}: couldn't make root directory\n"
+#expect "sudo ls -la root-only" ' *\.\/?$' || printf "${FAIL}: new root directories don't have .\n"
+#expect "sudo ls -la root-only" ' *\.\.\/?$' || printf "${FAIL}: new root directories don't have ..\n"
+#expect "sudo ls -la root-only/.." ' *\.users$' || printf "${FAIL}: new root directory .. doesn't point to root\n"
+#expect "echo a | sudo tee root-only/file" "sudo cat root-only/file" '^a$' || printf "${FAIL}: couldn't read back root created file in directory\n"
+#expect "echo a | sudo tee -a root-only/file" "sudo cat root-only/file" '^a\na$' || printf "${FAIL}: couldn't read back root appended file in directory\n"
+#expect "sudo ls -la root-only/." ' *file$' || printf "${FAIL}: new root directory . does not point to self\n"
+#
+#cant "create file in dir owned by other user" "echo b | tee root-only/user-file" "cat root-only/user-file"
+#cant "append to file owned by other user" "echo b | tee -a root-only/file" "pcregrep -M '^a\nb$ root-only/file"
+#cant "make directory in dir owned by other user" "mkdir root-only/user-only" "stat root-only/user-only"
+#fstats "root-only" "uid=root" "perm=drwxr-xr-x" || printf "${FAIL}: new root dir has incorrect permissions\n"
+#fstats "root-only/file" "uid=root" "perm=-rw-r--r--" || printf "${FAIL}: new nested root file has incorrect permissions\n"
+#
+#
+#section "Manipulating shared directories"
+## shared directory mkdir
+#expect "sudo sh -c 'umask 0200; sg users \"mkdir shared\"'" '^$' || printf "${FAIL}: couldn't create group-owned directory\n"
+#expect "sudo ls -la shared/.." ' *\.users/?$' || printf "${FAIL}: new shared directory .. doesn't point to root\n"
+#fstats "shared" "uid=root" "gid=users" "perm=dr-xrwxr-x" || printf "${FAIL}: new shared dir has incorrect permissions\n"
+#
+## user file in shared dir
+#user=$(id -un)
+#expect "echo b | tee shared/user-file" "cat shared/user-file" '^b$' || printf "${FAIL}: couldn't create user file in shared directory\n"
+#expect "echo b | tee -a shared/user-file" "cat shared/user-file" '^b\nb$' || printf "${FAIL}: couldn't appended to user file in shared directory\n"
+#fstats "shared/user-file" "uid=$user" "perm=-rw-r--r--" || printf "${FAIL}: new user file has incorrect permissions\n"
+#cant "append to file owned by other user as root" "echo x | sudo tee -a shared/user-file" "pcregrep -M '^b\nx$ shared/user-file"
+#
+#
+#section "Manipulating non-owner directories"
+## user dir in shared dir
+#expect "mkdir shared/user-only" '^$' || printf "${FAIL}: couldn't make user directory in shared dir\n"
+#expect "ls -la shared/user-only" ' *\.\/?$' || printf "${FAIL}: new user directories don't have .\n"
+#expect "ls -la shared/user-only" ' *\.\.\/?$' || printf "${FAIL}: new user directories don't have ..\n"
+#expect "ls -la shared/user-only/.." ' *user-only/?$' || printf "${FAIL}: new user directory .. doesn't point to parent\n"
+#expect "echo c | tee shared/user-only/file" "cat shared/user-only/file" '^c$' || printf "${FAIL}: couldn't read back user created file\n"
+#expect "echo c | tee -a shared/user-only/file" "cat shared/user-only/file" '^c\nc$' || printf "${FAIL}: couldn't read back user appended file\n"
+#expect "ls -la shared/user-only/." ' *file$' || printf "${FAIL}: new user directory . does not point to self\n"
+#
+#cant "create file in dir owned by other user as root" "echo b | sudo tee shared/user-only/root-file" "cat shared/user-only/root-file"
+#cant "append to file owned by other user as root" "echo x | sudo tee -a shared/user-only/file" "pcregrep -M '^c\nx$ shared/user-only/file"
+#cant "make directory in dir owned by other user as root" "sudo mkdir shared/user-only/root-dir" "stat shared/user-only/root-dir"
+#fstats "shared/user-only" "uid=$user" "perm=drwxr-xr-x" || printf "${FAIL}: new user dir has incorrect permissions\n"
+#fstats "shared/user-only/file" "uid=$user" "perm=-rw-r--r--" || printf "${FAIL}: new nested user file has incorrect permissions\n"
+#
+#
 section "Restricted read permissions"
 # Encrypted files (no read permission)
 expect "sudo sh -c 'umask 0004; echo supercalifragilisticexpialidocious > root-secret'" '^$' || printf "${FAIL}: couldn't create user-readable file as user\n"
 expect "sudo cat root-secret" '^supercalifragilisticexpialidocious$' || printf "${FAIL}: couldn't read user-readable file as user\n"
-server_mem "user-readable" "supercalifragilisticexpialidocious"
+#server_mem "user-readable" "supercalifragilisticexpialidocious"
 fstats "root-secret" "uid=root" "perm=-rw-------" || printf "${FAIL}: encrypted file has incorrect permissions\n"
 cant "read encrypted file belonging to other user" "cat root-secret"
+cleanup
+exit 1
+
+
 expect "echo y | sudo tee -a root-secret" "sudo cat root-secret" '^supercalifragilisticexpialidocious\ny$' || printf "${FAIL}: failed to append to encrypted file\n"
 
 # Encrypted shared files (no read permission)
