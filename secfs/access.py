@@ -5,6 +5,7 @@ def can_read(user, i):
     """
     Returns True if the given user can read the given i.
     """
+    print("In can_read checking {} vs {}".format(user, i))
     # Under our rules, any user who can write a file can also read it;
     # this check is done first because it doesn't need to hit the network.
     if can_write(user, i):
@@ -17,7 +18,7 @@ def can_read(user, i):
         return True
     # Ex3-note: return false if our user is not listed in the readkey.
     # TODO: consider whether we really want to do this.
-    if user in n.readkey:
+    if n.readkey and user in n.readkey:
         return True
     return False
 
