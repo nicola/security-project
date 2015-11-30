@@ -33,7 +33,7 @@ class Inode:
         Reads the block content of this inode.
         """
 
-       savedbytes = b"".join([secfs.store.block.load(b) for b in self.blocks])
+        savedbytes = b"".join([secfs.store.block.load(b) for b in self.blocks])
         if self.encryptfor:
             # Ex3:
             # 1. Get the bulk key for decrypting.
