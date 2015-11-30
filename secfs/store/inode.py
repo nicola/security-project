@@ -90,6 +90,7 @@ class Inode:
                 #    3d. store self.readkey, and return the symmetric key
                 self.readkey[user] = secfs.crypto.encrypt(user, secret)
             # 4. Bulk encrypt and store as self.blocks
+            # TODO: encrypt_sym should probably be of the type b"string"
             savedbytes = secfs.crypto.encrypt_sym(readkey, filebytes)
 
         self.blocks = [secfs.store.block.store(savedbytes)]
