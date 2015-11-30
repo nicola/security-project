@@ -5,20 +5,20 @@ def can_read(user, i):
     """
     Returns True if the given user can read the given i.
     """
-    # TODO: may be that you need to copy the logic up here
-
-    print("calling can_read({}, {})".format(user, i))
+    # Under our rules, any user who can write a file can also read it;
+    # this check is done first because it doesn't need to hit the network.
     if can_write(user, i):
-        print("can_write({}, {}) returned True".format(user, i))
         return True
 
+    # Some files are world-readable.  We need the inode to know that.
     n = secfs.fs.get_inode(i)
-    # Ex3: switch to n.encryptfor, strip out the "prints" from this file.
-    if not n.encrypt:
-        print("n.encrypt was False, so returning True")
+    # Ex3-note: encryptfor is None if the file is world-readble.
+    if not n.encryptfor:
         return True
-
-    print("n.encrypt was True, so returning False")
+    # Ex3-note: return false if our user is not listed in the readkey.
+    # TODO: consider whether we really want to do this.
+    if user in n.readkey:
+        return True
     return False
 
 def can_write(user, i):

@@ -265,9 +265,10 @@ class SecFS(llfuse.Operations):
         print("LOOKUP", inode_p, name)
 
         global lastctx
-        self._pre(User(lastctx.uid))
-        # Ex3: add read_as to find_under
-        i = secfs.store.tree.find_under(inodes[inode_p], name)
+        user = User(lastctx.uid)
+        self._pre(user)
+        # Ex3-note: user is read_as for decrypting dir for find_under
+        i = secfs.store.tree.find_under(user, inodes[inode_p], name)
         if i == None:
             self._post()
             raise llfuse.FUSEError(errno.ENOENT)
@@ -299,15 +300,15 @@ class SecFS(llfuse.Operations):
 
     def readdir(self, fh, off):
         print("READDIR", fh, off)
+        i, user = fhs[fh]
+        self._pre(user)
 
-        self._pre(fhs[fh][1])
-
-        node = secfs.fs.get_inode(fhs[fh][0])
+        node = secfs.fs.get_inode(i)
         if node.kind != 0:
             raise llfuse.FUSEError(errno.ENOTDIR)
 
-        # Ex3: add read_as below (maybe fhs[fh][1])
-        for e, o in secfs.fs.readdir(fhs[fh][0], off):
+        # Ex3-note: pass user as the read_as for decryption
+        for e, o in secfs.fs.readdir(user, i, off):
             print (e[0].decode('utf-8'), e[1], o)
             yield (e[0], _getattr(e[1]), o)
 
@@ -474,8 +475,8 @@ class SecFS(llfuse.Operations):
             # TODO: warn if trying to change other bits -- has no effect.
         if attr.st_size is not None:
             if attr.st_size == 0:
-                # Ex3: use node.clear(clear_as) to set node.blocks
-                node.blocks = []
+                # Ex3-note: use node.write to do encryption of empty file.
+                node.write(who, b'')
                 node.size = 0
             else:
                 # NOTE: we could technically do this, but it is much more
@@ -548,12 +549,11 @@ def _reload_principals():
         """
         return pickle.loads(
                 secfs.fs.get_inode(
-                    # Ex3: add read_as to find_under - maybe set to None
-                    secfs.store.tree.find_under(secfs.fs.root_i, fname)
+                    # Ex3-note: root directory is unencrypted, read as none
+                    secfs.store.tree.find_under(None, secfs.fs.root_i, fname)
                 )
-                .read()
-                # Ex3: .users/.groups is not encrypted.
-                # pass read_as None above.
+                .read(None)
+                # Ex3-note: .users/.groups is not encrypted.
             )
 
     # load group map
@@ -607,8 +607,7 @@ def _getattr(i):
             entry.st_mode |= stat.S_IFREG
 
         # Is it encrypted (i.e. limited read access)?
-        # Ex3: if n.encryptfor is not None
-        if not n.encrypt:
+        if n.encryptfor is None:
             # everyone can read
             entry.st_mode |= stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
         else:
