@@ -316,6 +316,8 @@ class SecFS(llfuse.Operations):
 
     def open(self, inode, flags):
         print("OPEN", inode, flags)
+        # Fixes 'read encrypted file belonging to other user'
+        llfuse.invalidate_inode(inode) 
 
         global lastctx
         self._pre(User(lastctx.uid))
