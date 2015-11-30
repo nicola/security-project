@@ -46,6 +46,29 @@ def verify(obj, signature, user):
     verifier.verify()
     return True
 
+def encrypt(user, data):
+    public_key = secfs.fs.usermap[user]
+    ciphertext = public_key.encrypt(
+        data,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA1()),
+            algorithm=hashes.SHA1(),
+            label=None
+        )
+    )
+    return ciphertext
+
+def decrypt(user, ciphertext):
+    private_key = keys[user]
+    data = private_key.decrypt(
+    ciphertext,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA1()),
+            algorithm=hashes.SHA1(),
+            label=None
+        )
+    )
+    return data
 
 def register_keyfile(user, f):
     """
