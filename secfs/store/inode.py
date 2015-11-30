@@ -2,6 +2,7 @@ import pickle
 import secfs.store.block
 import secfs.crypto
 import uuid
+import os
 
 class Inode:
     def __init__(self):
@@ -31,6 +32,7 @@ class Inode:
     def read(self, read_as):
         """
         Reads the block content of this inode.
+        If decryption fails, we return the encrypted bytes
         """
         savedbytes = b"".join([secfs.store.block.load(b) for b in self.blocks])
         # TODO: Check if file exists
@@ -40,9 +42,10 @@ class Inode:
             #    1a. fail (return None) if read_as is not in the readkey map.
             # TODO: check if the dictionary has this type of objects as keys
             print("Inode is encrypted, {} is trying to read".format(read_as))
+            print("readkeys?", self.readkey)
             if read_as not in self.readkey:
                 print("Oh no, {} is not in readkey {}".format(read_as, self.readkey))
-                return None
+                return savedbytes # Just fail to decrypt rather than return None
             #    1b. use my private key for decrypting the bulk key.
             # TODO: check if this throws an exception
             readkey = secfs.crypto.decrypt(read_as, self.readkey[read_as])
@@ -80,11 +83,11 @@ class Inode:
             # note https://bugs.launchpad.net/pig-latin/+cve
             # There are no CVE reports against this scheme.
 
-            # 2. Fail if write_as is incompatible with encryptfor -
+            # 2. TODO Fail if write_as is incompatible with encryptfor -
             #    we must be that user or in that group.
             # 3. Generate a symmetrc key and save as readkeys
             #    3a. generate a random symmetric key
-            secret = uuid.uuid4() 
+            secret = secfs.crypto.generate_ephemeral_key()
             #    3b. fetch all the public keys for self.encryptfor (group or user)
             # TODO: can I just read the people in the readkey?
             # TODO: the answer is NO, since when I create the file there are no readkeys!

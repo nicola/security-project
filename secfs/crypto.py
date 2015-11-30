@@ -97,8 +97,13 @@ def encrypt_sym(key, data):
     """
     Encrypt the given data with the given key.
     """
+    print("in encrypt_sym", key, data)
     f = Fernet(key)
+    print("Fernet object", f)
     return f.encrypt(data)
+
+def generate_ephemeral_key():
+    return Fernet.generate_key()
 
 def generate_key(user):
     """
