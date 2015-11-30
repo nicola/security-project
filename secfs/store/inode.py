@@ -1,6 +1,7 @@
 import pickle
 import secfs.store.block
 import secfs.crypto
+import uuid
 
 class Inode:
     def __init__(self):
@@ -80,10 +81,8 @@ class Inode:
             #    we must be that user or in that group.
             # 3. Generate a symmetrc key and save as readkeys
             #    3a. generate a random symmetric key
-            # TODO: generate random secret
-            secret = "magic secret"
+            secret = uuid.uuid4() 
             #    3b. fetch all the public keys for self.encryptfor (group or user)
-            # TODO: get everyone's keys in the group
             # TODO: can I just read the people in the readkey?
             users = self.readkey.keys() 
             for user in users:

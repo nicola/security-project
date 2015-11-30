@@ -47,6 +47,7 @@ def verify(obj, signature, user):
     return True
 
 def encrypt(user, data):
+    # TODO: what about groups?
     public_key = secfs.fs.usermap[user]
     ciphertext = public_key.encrypt(
         data,
