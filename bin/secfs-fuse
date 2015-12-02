@@ -263,17 +263,23 @@ class SecFS(llfuse.Operations):
 
     def lookup(self, inode_p, name):
         print("LOOKUP", inode_p, name)
+        try:
+            global lastctx
+            user = User(lastctx.uid)
+            self._pre(user)
+            # Ex3-note: user is read_as for decrypting dir for find_under
+            i = secfs.store.tree.find_under(user, inodes[inode_p], name)
+            if i == None:
+                raise llfuse.FUSEError(errno.ENOENT)
 
-        global lastctx
-        user = User(lastctx.uid)
-        self._pre(user)
-        # Ex3-note: user is read_as for decrypting dir for find_under
-        i = secfs.store.tree.find_under(user, inodes[inode_p], name)
-        if i == None:
+            return self._post_and_getattr(i)
+        except PermissionError as e:
+            print("Illegal access:", e)
             self._post()
-            raise llfuse.FUSEError(errno.ENOENT)
-
-        return self._post_and_getattr(i)
+            raise llfuse.FUSEError(errno.EACCES)
+        except:
+            self._post()
+            raise
 
     def getattr(self, inode):
         print("GETATTR", inode)
@@ -285,51 +291,71 @@ class SecFS(llfuse.Operations):
 
     def opendir(self, inode):
         print("OPENDIR", inode)
+        try:
+            global lastctx
+            self._pre(User(lastctx.uid))
 
-        global lastctx
-        self._pre(User(lastctx.uid))
+            i = inodes[inode]
+            node = secfs.fs.get_inode(i)
+            if node.kind != 0:
+                raise llfuse.FUSEError(errno.ENOTDIR)
 
-        i = inodes[inode]
-        node = secfs.fs.get_inode(i)
-        if node.kind != 0:
-            raise llfuse.FUSEError(errno.ENOTDIR)
-
-        ret = new_fh(i, lastctx.uid)
-        self._post()
-        return ret
+            ret = new_fh(i, lastctx.uid)
+            self._post()
+            return ret
+        except PermissionError as e:
+            print("Illegal access:", e)
+            self._post()
+            raise llfuse.FUSEError(errno.EACCES)
+        except:
+            self._post()
+            raise
 
     def readdir(self, fh, off):
         print("READDIR", fh, off)
-        i, user = fhs[fh]
-        self._pre(user)
+        try:
+            i, user = fhs[fh]
+            self._pre(user)
+            node = secfs.fs.get_inode(i)
+            if node.kind != 0:
+                raise llfuse.FUSEError(errno.ENOTDIR)
 
-        node = secfs.fs.get_inode(i)
-        if node.kind != 0:
-            raise llfuse.FUSEError(errno.ENOTDIR)
-
-        # Ex3-note: pass user as the read_as for decryption
-        for e, o in secfs.fs.readdir(user, i, off):
-            print (e[0].decode('utf-8'), e[1], o)
-            yield (e[0], _getattr(e[1]), o)
-
-        self._post()
+            # Ex3-note: pass user as the read_as for decryption
+            for e, o in secfs.fs.readdir(user, i, off):
+                print (e[0].decode('utf-8'), e[1], o)
+                yield (e[0], _getattr(e[1]), o)
+            self._post()
+        except PermissionError as e:
+            print("Illegal access:", e)
+            self._post()
+            raise llfuse.FUSEError(errno.EACCES)
+        except:
+            self._post()
+            raise
 
     def open(self, inode, flags):
         print("OPEN", inode, flags)
         # Fixes 'read encrypted file belonging to other user'
         llfuse.invalidate_inode(inode) 
+        try:
+            global lastctx
+            self._pre(User(lastctx.uid))
 
-        global lastctx
-        self._pre(User(lastctx.uid))
+            i = inodes[inode]
+            node = secfs.fs.get_inode(i)
+            if node.kind != 1:
+                raise llfuse.FUSEError(errno.EISDIR)
 
-        i = inodes[inode]
-        node = secfs.fs.get_inode(i)
-        if node.kind != 1:
-            raise llfuse.FUSEError(errno.EISDIR)
-
-        ret = new_fh(i, lastctx.uid)
-        self._post()
-        return ret
+            ret = new_fh(i, lastctx.uid)
+            self._post()
+            return ret
+        except PermissionError as e:
+            print("Illegal access:", e)
+            self._post()
+            raise llfuse.FUSEError(errno.EACCES)
+        except:
+            self._post()
+            raise
 
     def access(self, inode, mode, ctx):
         print("ACCESS", inode, mode, ctx.uid, ctx.gid, ctx.umask)
