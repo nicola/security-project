@@ -1,6 +1,8 @@
 import pickle
 import secfs.store.block
 import secfs.crypto
+import uuid
+import os
 
 class Inode:
     def __init__(self):
@@ -9,7 +11,7 @@ class Inode:
         self.ex = False
         # Ex3-note: encryptfor is the user/group for whom we encrypt.
         self.encryptfor = None
-        self.readkey = None # Ex3: map uid -> encrypted symmetric key
+        self.readkey = dict() # Ex3: map uid -> encrypted symmetric key
         self.ctime = 0
         self.mtime = 0
         self.blocks = []
@@ -30,18 +32,30 @@ class Inode:
     def read(self, read_as):
         """
         Reads the block content of this inode.
+        If decryption fails, we return the encrypted bytes
         """
-        # Ex3:
-        # 1. Get the bulk key for decrypting.
-        #    1a. fail (return None) if read_as is not in the readkey map.
-        #    1b. fetch my own private key.
-        #    1c. use my private key for decrypting the bulk key.
-        #    1d. fail (return None) if that decryption fails.
-        # 2. If the key is None, return the raw bytes
-        # 3. If the key is not None, use it to decrypt the bytes
         savedbytes = b"".join([secfs.store.block.load(b) for b in self.blocks])
-        if self.encryptfor:
-            return savedbytes[::-1]  # super-secure pig-latin encryption
+        # TODO: Check if file exists
+        if len(savedbytes) > 0 and self.encryptfor:
+            # Ex3:
+            # 1. Get the bulk key for decrypting.
+            #    1a. fail (return None) if read_as is not in the readkey map.
+            # TODO: check if the dictionary has this type of objects as keys
+            print("Inode is encrypted, {} is trying to read".format(read_as))
+            if read_as not in self.readkey:
+                print("Oh no, {} is not in readkey {}".format(read_as, self.readkey))
+                return savedbytes # Just fail to decrypt rather than return None
+            #    1b. use my private key for decrypting the bulk key.
+            # TODO: check if this throws an exception
+            readkey = secfs.crypto.decrypt(read_as, self.readkey[read_as])
+            print("User {} has found the secret {}".format(read_as, readkey))
+            #    1c. fail (return None) if that decryption fails.
+            # 2. If the key is None, return the raw bytes
+            if not readkey:
+                return savedbytes
+            # 3. If the key is not None, use it to decrypt the bytes
+            return secfs.crypto.decrypt_sym(readkey, savedbytes) 
+
         return savedbytes
 
     # Ex3: instead of manipulating blocks directly, use this to
@@ -60,19 +74,37 @@ class Inode:
             else:
                 savedbytes = filebytes
         else:
-            # Encrypt using super-secure pig-latin encryption.
+            # Note to future developers:
+            # We originally implemented this using pig-latin encryption
+            # We only switched to this new scheme because the TAs
+            # forced us.
+            # Consider encrypting using super-secure pig-latin encryption.
             # note https://bugs.launchpad.net/pig-latin/+cve
             # There are no CVE reports against this scheme.
-            savedbytes = filebytes[::-1]
+
+            # 2. TODO Fail if write_as is incompatible with encryptfor -
+            #    we must be that user or in that group.
+            # 3. Generate a symmetrc key and save as readkeys
+            #    3a. generate a random symmetric key
+            secret = secfs.crypto.generate_ephemeral_key()
+            self.readkey = {} # zero out the dictionary just in case
+            #    3b. fetch all the public keys for self.encryptfor (group or user)
+            # TODO: can I just read the people in the readkey?
+            # TODO: the answer is NO, since when I create the file there are no readkeys!
+            # TODO: Retrieve the users in the group
+            if self.encryptfor.is_group():
+                users = secfs.fs.groupmap[self.encryptfor]
+                for user in users:
+                    #    3c. encrypt the symmetric key with each of the public keys
+                    #    3d. store self.readkey, and return the symmetric key
+                    self.readkey[user] = secfs.crypto.encrypt(user, secret)
+            else:
+                self.readkey[write_as] = secfs.crypto.encrypt(write_as, secret)
+            # 4. Bulk encrypt and store as self.blocks
+            # TODO: encrypt_sym should probably be of the type b"string"
+            savedbytes = secfs.crypto.encrypt_sym(secret, filebytes)
+
         self.blocks = [secfs.store.block.store(savedbytes)]
-        # 2. Fail if write_as is incompatible with encryptfor -
-        #    we must be that user or in that group.
-        # 3. Generate a symmetrc key and save as readkeys
-        #    3a. generate a random symmetric key
-        #    3b. fetch all the public keys for self.encryptfor (group or user)
-        #    3c. encrypt the symmetric key with each of the public keys
-        #    3d. store self.readkey, and return the symmetric key
-        # 4. Bulk encrypt and store as self.blocks
 
     def bytes(self):
         """
