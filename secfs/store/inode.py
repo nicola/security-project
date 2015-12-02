@@ -44,7 +44,8 @@ class Inode:
             print("Inode is encrypted, {} is trying to read".format(read_as))
             if read_as not in self.readkey:
                 print("Oh no, {} is not in readkey {}".format(read_as, self.readkey))
-                return savedbytes # Just fail to decrypt rather than return None
+                # Do not return anything - raise an permission exception
+                raise PermissionError('missing key needed to decyrypt file')
             #    1b. use my private key for decrypting the bulk key.
             # TODO: check if this throws an exception
             readkey = secfs.crypto.decrypt(read_as, self.readkey[read_as])
