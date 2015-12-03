@@ -6,6 +6,7 @@ import secfs.tables
 import secfs.access
 import secfs.store.tree
 import secfs.store.block
+import secfs.principal
 from secfs.store.inode import Inode
 from secfs.store.tree import Directory
 from cryptography.fernet import Fernet
@@ -62,14 +63,9 @@ def init(owner, users, groups):
     secfs.tables.modmap(owner, root_i, new_ihash)
     print("CREATED ROOT AT", new_ihash)
 
-    init = {
-        b".users": users,
-        b".groups": groups,
-    }
+    init = secfs.principal.init_files(users, groups)
 
-    import pickle
-    for fn, c in init.items():
-        bts = pickle.dumps(c)
+    for fn, bts in init.items():
 
         node = Inode()
         node.kind = 1
