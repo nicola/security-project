@@ -28,12 +28,10 @@ class GroupMap:
         # Returns true if the group is a secret group.
         # A secret group can own no world-readable files.
         # read_as is the User asking the question.
-        return b''
         return False
     def members(self, read_as, group):
         # Returns the members of the group, if allowed to see them.
         # read_as is the User asking the question.
-        return b''
         return self.membermap[group]
     def exists(self, read_as, group):
         # EC: see if the reader can tell that a given group exists.
