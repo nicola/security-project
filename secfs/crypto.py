@@ -7,7 +7,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.fernet import Fernet
 from secfs.types import I, Principal, User, Group
-import secfs.fs
+import secfs.principal
 
 keys = {}
 
@@ -34,7 +34,7 @@ def verify(obj, signature, user):
     """
     if signature == {}:
         return False
-    public_key = secfs.fs.usermap[user]
+    public_key = secfs.principal.user_public_key(user)
     verifier = public_key.verifier(
         signature,
         padding.PSS(
@@ -48,7 +48,7 @@ def verify(obj, signature, user):
 
 def encrypt(user, data):
     # TODO: what about groups?
-    public_key = secfs.fs.usermap[user]
+    public_key = secfs.principal.user_public_key(user)
     ciphertext = public_key.encrypt(
         data,
         padding.OAEP(

@@ -36,8 +36,9 @@ def can_write(user, i):
     if i.p.is_user() and i.p != user:
         return False
 
+    # if i.p.is_group, check secfs.groups.is_member(user, i.p)
     # If a group owns i, and you aren't in the group, you can't write
-    if i.p.is_group() and (i.p not in secfs.fs.groupmap or user not in secfs.fs.groupmap[i.p]):
+    if i.p.is_group() and not secfs.principal.is_member(user, i.p):
         return False
 
     return True

@@ -6,15 +6,12 @@ import secfs.tables
 import secfs.access
 import secfs.store.tree
 import secfs.store.block
+import secfs.principal
 from secfs.store.inode import Inode
 from secfs.store.tree import Directory
 from cryptography.fernet import Fernet
 from secfs.types import I, Principal, User, Group
 
-# usermap contains a map from user ID to their public key according to /.users
-usermap = {}
-# groupmap contains a map from group ID to the list of members according to /.groups
-groupmap = {}
 # owner is the user principal that owns the current share
 owner = None
 # root_i is the i of the root of the current share
@@ -61,14 +58,9 @@ def init(owner, users, groups):
     secfs.tables.modmap(owner, root_i, new_ihash)
     print("CREATED ROOT AT", new_ihash)
 
-    init = {
-        b".users": users,
-        b".groups": groups,
-    }
+    init = secfs.principal.init_files(users, groups)
 
-    import pickle
-    for fn, c in init.items():
-        bts = pickle.dumps(c)
+    for fn, bts in init.items():
 
         node = Inode()
         node.kind = 1
@@ -101,8 +93,16 @@ def _create(parent_i, name, create_as, create_for, isdir, encrypt):
 
     assert create_as.is_user() # only users can create
     assert create_as == create_for or create_for.is_group() # create for yourself or for a group
-    if create_for.is_group() and create_for not in groupmap:
-        raise PermissionError("cannot create for unknown group {}".format(create_for))
+    if create_for.is_group():
+        if not secfs.principal.group_exists(create_as, create_for):
+            raise PermissionError(
+                    "cannot create for unknown group {}"
+                    .format(create_for))
+        if not encrypt and secfs.principal.is_secret_group(
+                create_as, create_for):
+            raise PermissionError(
+                    "cannot create public data for secret group {}"
+                    .format(create_for))
 
     # This check is performed by link() below, but better to fail fast
     if not secfs.access.can_write(create_as, parent_i):

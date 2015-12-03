@@ -4,7 +4,6 @@ import sys
 import stat
 import time
 import errno
-import pickle
 import llfuse
 import logging
 from llfuse import FUSEError
@@ -12,6 +11,7 @@ from llfuse import FUSEError
 import secfs.access
 import secfs.store
 import secfs.fs
+import secfs.principal
 from secfs.types import I, Principal, User, Group
 
 # Welcome to the SecFS secure file system.
@@ -219,10 +219,9 @@ class SecFS(llfuse.Operations):
             # initialize a new share, and tell the server about it. don't
             # refresh the user and group maps, as they have not yet been built.
             self._pre(mounter, False)
-            root = secfs.fs.init(mounter,
-                {u: secfs.crypto.generate_key(u) for u in secfs.crypto.keys},
-                {Group(100): [u for u in secfs.crypto.keys if u.id != 666]}
-            )
+            # EC: add anongroups
+            users, groups = secfs.principal.default_users_and_groups()
+            root = secfs.fs.init(mounter, users, groups)
             self.server.create(self.share, root)
             self._post()
 
@@ -244,7 +243,9 @@ class SecFS(llfuse.Operations):
             pem = f.read()
             secfs.fs.root_i = root
             secfs.fs.owner = root.p
-            secfs.fs.usermap[root.p] = load_pem_public_key(pem, backend=default_backend())
+            secfs.principal.set_root_public_key(
+                    root.p,
+                    load_pem_public_key(pem, backend=default_backend()))
 
         # Set up lastctx in case one of the non-context methods are called first
         global lastctx
@@ -567,32 +568,11 @@ class SecFS(llfuse.Operations):
 def _reload_principals():
     """
     Reloads the set of known principals by reading and parsing /.users and
-    /.groups, and the repopulating secfs.fs.usermap and secfs.fs.groupmap.
+    /.groups, and the repopulating principals data structures.
     """
+
     print("Entering _reload_principals")
-    def _read_file(fname):
-        """
-        Simple helper function for reading the pickled contents of a SecFS file
-        located in the root of the file system.
-        """
-        return pickle.loads(
-                secfs.fs.get_inode(
-                    # Ex3-note: root directory is unencrypted, read as none
-                    secfs.store.tree.find_under(None, secfs.fs.root_i, fname)
-                )
-                .read(None)
-                # Ex3-note: .users/.groups is not encrypted.
-            )
-
-    # load group map
-    secfs.fs.groupmap = _read_file(b".groups")
-
-    # load user public key map (and decode their PEM-encoded public keys)
-    from cryptography.hazmat.primitives.serialization import load_pem_public_key
-    from cryptography.hazmat.backends import default_backend
-    secfs.fs.usermap = {}
-    for p, pem in _read_file(b".users").items():
-        secfs.fs.usermap[p] = load_pem_public_key(pem, backend=default_backend())
+    secfs.principal.reload()
     print("Exiting _reload_principals")
 
 def _getattr(i):
