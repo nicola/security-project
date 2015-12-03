@@ -585,6 +585,7 @@ def _reload_principals():
             )
 
     # load group map
+    # EC: just secfs.groups.clearknowledge()
     secfs.fs.groupmap = _read_file(b".groups")
 
     # load user public key map (and decode their PEM-encoded public keys)

@@ -88,18 +88,22 @@ class Inode:
             # 3. Generate a symmetrc key and save as readkeys
             #    3a. generate a random symmetric key
             secret = secfs.crypto.generate_ephemeral_key()
+            # EC: now just None instead of a dict
             self.readkey = {} # zero out the dictionary just in case
             #    3b. fetch all the public keys for self.encryptfor (group or user)
             # TODO: can I just read the people in the readkey?
             # TODO: the answer is NO, since when I create the file there are no readkeys!
             # TODO: Retrieve the users in the group
             if self.encryptfor.is_group():
+                # EC: groupsecret = secfs.groups.members(self.write_as)
+                # EC: readkey = encrypt secret using groupsecret.
                 users = secfs.fs.groupmap[self.encryptfor]
                 for user in users:
                     #    3c. encrypt the symmetric key with each of the public keys
                     #    3d. store self.readkey, and return the symmetric key
                     self.readkey[user] = secfs.crypto.encrypt(user, secret)
             else:
+                # EC: readkey is not a map any more
                 self.readkey[write_as] = secfs.crypto.encrypt(write_as, secret)
             # 4. Bulk encrypt and store as self.blocks
             # TODO: encrypt_sym should probably be of the type b"string"
