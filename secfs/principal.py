@@ -1,10 +1,26 @@
-import pickle
+import json
 import secfs.fs
+import secfs.crypto
+from secfs.types import User, Group
+
+def default_users_and_groups():
+    users = {u: secfs.crypto.generate_key(u) for u in secfs.crypto.keys}
+    groups = {Group(100): [u for u in secfs.crypto.keys if u.id != 666]}
+    return (users, groups)
+
 
 def init_files(users, groups):
     return {
-        b".users": pickle.dumps(users),
-        b".groups": pickle.dumps(groups)
+        b".users": json.dumps(
+                {str(u.id): v.decode('utf-8')
+                    for u, v in users.items()},
+                indent=2
+            ).encode('utf-8'),
+        b".groups": json.dumps(
+                {str(g.id): [u.id for u in v]
+                    for g, v in groups.items()},
+                indent=2
+            ).encode('utf-8')
     }
 
 def reload():
@@ -13,26 +29,28 @@ def reload():
         Simple helper function for reading the pickled contents of a SecFS file
         located in the root of the file system.
         """
-        return pickle.loads(
+        return json.loads(
                 secfs.fs.get_inode(
                     # Ex3-note: root directory is unencrypted, read as none
                     secfs.store.tree.find_under(None, secfs.fs.root_i, fname)
                 )
-                .read(None)
+                .read(None).decode('utf-8')
                 # Ex3-note: .users/.groups is not encrypted.
             )
 
     # load group map
     # EC: just secfs.groups.clearknowledge()
-    secfs.fs.groupmap = _read_file(b".groups")
+    secfs.fs.groupmap = {
+        Group(int(g)): [User(u) for u in v]
+        for g, v in _read_file(b".groups").items()}
 
     # load user public key map (and decode their PEM-encoded public keys)
     from cryptography.hazmat.primitives.serialization import load_pem_public_key
     from cryptography.hazmat.backends import default_backend
     secfs.fs.usermap = {}
-    for p, pem in _read_file(b".users").items():
-        secfs.fs.usermap[p] = load_pem_public_key(
-           pem, backend=default_backend())
+    for u, pem in _read_file(b".users").items():
+        secfs.fs.usermap[User(int(u))] = load_pem_public_key(
+           pem.encode('utf-8'), backend=default_backend())
 
 # With anonymized groups, the metadata in the filesystem is now
 # organized as follows:

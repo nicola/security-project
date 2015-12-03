@@ -220,10 +220,8 @@ class SecFS(llfuse.Operations):
             # refresh the user and group maps, as they have not yet been built.
             self._pre(mounter, False)
             # EC: add anongroups
-            root = secfs.fs.init(mounter,
-                {u: secfs.crypto.generate_key(u) for u in secfs.crypto.keys},
-                {Group(100): [u for u in secfs.crypto.keys if u.id != 666]}
-            )
+            users, groups = secfs.principal.default_users_and_groups()
+            root = secfs.fs.init(mounter, users, groups)
             self.server.create(self.share, root)
             self._post()
 
