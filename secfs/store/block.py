@@ -1,5 +1,6 @@
 # This file handles all interaction with the SecFS server's blob storage.
 
+import hashlib
 # a server connection handle is passed to us at mount time by secfs-fuse
 server = None
 def register(_server):
@@ -10,8 +11,17 @@ def store(blob):
     """
     Store the given blob at the server, and return the content's hash.
     """
+
+    # We should protect against an adversarial server:
+    # a server should never lie to us about the hash of our data
+    chash = hashlib.sha224(blob).hexdigest()
+
     global server
-    return server.store(blob)
+    shash = server.store(blob)
+    assert chash == shash, "UNTRUSTED SERVER: hash {} instead of {}".format(
+        shash, chash)
+
+    return chash
 
 def load(chash):
     """
