@@ -2,11 +2,36 @@ import json
 import secfs.fs
 import secfs.crypto
 from secfs.types import User, Group
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.hazmat.backends import default_backend
 
 # Brought over from fs.py.
 
+class UserMap:
+    """
+    Represents the contents of .users.
+    """
+    def __init__(self, initmap=None):
+        self.keymap = initmap if initmap else {}
+    def public_key(self, user):
+        return self.keymap[user]
+    def set_public_key(self, user, key):
+        self.keymap[user] = key
+    def from_blob(blob):
+        plain_dict = json.loads(blob.decode('utf-8'))
+        public_key = {}
+        for u, pem in plain_dict.items():
+            public_key[User(int(u))] = load_pem_public_key(
+                pem.encode('utf-8'), backend=default_backend())
+        return UserMap(public_key)
+    def as_blob(self):
+        plain_dict = {
+            str(u.id): v.decode('utf-8') for u, v in self.keymap.items()
+        }
+        return json.dumps(plain_dict, indent=2).encode('utf-8')
+
 # usermap contains a map from user ID to their public key according to /.users
-usermap = {}
+usermap = UserMap()
 # groupmap contains a map from group ID to the list of members according to /.groups
 groupmap = {}
 
@@ -20,19 +45,17 @@ def group_members(read_by, group):
     return groupmap[group]
 
 def group_exists(group):
-    print('Testing if group exists', group)
-    print('Groupmap is', groupmap)
     return group in groupmap
 
 def user_public_key(user):
-    return usermap[user]
+    return usermap.public_key(user)
 
 def set_root_public_key(user, public_key):
     """
     Used when bootstrapping a filesystem, before anything is loaded
     from the server.  We need a root identity who owns the root directory.
     """
-    usermap[user] = public_key
+    usermap.set_public_key(user, public_key)
 
 def default_users_and_groups():
     """
@@ -72,28 +95,24 @@ def reload():
         Simple helper function for reading the pickled contents of a SecFS file
         located in the root of the file system.
         """
-        return json.loads(
-                secfs.fs.get_inode(
+        return secfs.fs.get_inode(
                     # Ex3-note: root directory is unencrypted, read as none
                     secfs.store.tree.find_under(None, secfs.fs.root_i, fname)
-                )
-                .read(None).decode('utf-8')
+                ).read(None)
                 # Ex3-note: .users/.groups is not encrypted.
-            )
 
     # load group map
     # EC: just secfs.groups.clearknowledge()
     groupmap = {
         Group(int(g)): [User(u) for u in v]
-        for g, v in _read_file(b".groups").items()}
+        for g, v in json.loads(_read_file(b".groups").decode('utf-8')).items()}
 
     # load user public key map (and decode their PEM-encoded public keys)
-    from cryptography.hazmat.primitives.serialization import load_pem_public_key
-    from cryptography.hazmat.backends import default_backend
-    usermap = {}
-    for u, pem in _read_file(b".users").items():
-        usermap[User(int(u))] = load_pem_public_key(
-           pem.encode('utf-8'), backend=default_backend())
+    usermap = UserMap.from_blob(_read_file(b".users"))
+
+
+
+
 
 # With anonymized groups, the metadata in the filesystem is now
 # organized as follows:
