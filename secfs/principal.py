@@ -19,24 +19,30 @@ class GroupMap:
         self.perusermap = peruserinit if peruserinit else {}
         # EC: Change this to a map by users (maybe in addition
         # to a list of groups?)
+
+    # Finds a group blob inside of perusermap
+    # If found, returns (gp, gp_secret, isSecret)
+    def find_group_object(self, user, group):
+        if user not in self.perusermap.keys():
+            print("FAILED TO FIND USER")
+            return None
+        for gp_object in self.perusermap[user]:
+            gp_data = None
+            if gp_object[1]:
+                gp, gp_secret = pickle.loads(secfs.crypto.decrypt(user, gp_object[0]))
+                gp_data = (gp, gp_secret, gp_object[1])
+            else:
+                gp_secret = pickle.loads(secfs.crypto.decrypt(user, gp_object[0]))
+                gp_data = (gp_object[2], gp_secret, gp_object[1])
+            if gp_data[0] == group:
+                return gp_object
+        return None
     def is_member(self, user, group):
         # 1. Apply user's decryption key to check its group memberships
         if not self.exists(user, group):
             return False
-        if self.is_secret_group(user, group):
-            for gp_object in self.perusermap[user]:
-                if gp_object[1]:
-                    gp_data = pickle.loads(secfs.crypto.decrypt_asym(user, gp_object[0]))
-                    print("GROUP DATA:", gp_data)
-                    if (gp_data[0] == group):
-                        return True
-        else:
-            print ("IS_MEMBER:", group in self.perusermap[user])
-            for gp_object in self.perusermap[user]:
-                if not gp_object[1]:
-                    if (gp_object[2] == group):
-                        return True
-        return False #user in self.membermap[group]['data']
+        if self.find_group_object(user, group):
+            return True
     def secret_key(self, read_as, group):
         # Returns the group secret key, if allowed to access it.
         # read_as is the User asking the question.
