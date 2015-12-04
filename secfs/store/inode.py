@@ -43,20 +43,25 @@ class Inode:
             #    1a. fail (return None) if read_as is not in the readkey map.
             # TODO: check if the dictionary has this type of objects as keys
             print("Inode is encrypted, {} is trying to read".format(read_as))
-            if read_as not in self.readkey:
-                print("Oh no, {} is not in readkey {}".format(read_as, self.readkey))
-                # Do not return anything - raise an permission exception
-                raise PermissionError('missing key needed to decyrypt file')
             #    1b. use my private key for decrypting the bulk key.
             # TODO: check if this throws an exception
-            readkey = secfs.crypto.decrypt(read_as, self.readkey[read_as])
-            print("User {} has found the secret {}".format(read_as, readkey))
-            #    1c. fail (return None) if that decryption fails.
-            # 2. If the key is None, return the raw bytes
-            if not readkey:
-                return savedbytes
-            # 3. If the key is not None, use it to decrypt the bytes
-            return secfs.crypto.decrypt_sym(readkey, savedbytes) 
+            if self.encryptfor.is_group():
+                if not secfs.principal.is_member(read_as, self.encryptfor):
+                    raise PermissionError('User {} is not allowed to read file belonging to group {}'.format(read_as, self.encryptfor))
+                readkey = secfs.principal.group_secret_key(read_as, self.encryptfor)
+                return secfs.crypto.decrypt_sym(readkey, savedbytes) 
+            else:
+                if read_as not in self.readkey:
+                    print("Oh no, {} is not in readkey {}".format(read_as, self.readkey))
+                    # Do not return anything - raise an permission exception
+                    raise PermissionError('missing key needed to decyrypt file')
+                readkey = secfs.crypto.decrypt(read_as, self.readkey[read_as])
+                #    1c. fail (return None) if that decryption fails.
+                # 2. If the key is None, return the raw bytes
+                if not readkey:
+                    return savedbytes
+                # 3. If the key is not None, use it to decrypt the bytes
+                return secfs.crypto.decrypt_sym(readkey, savedbytes) 
 
         return savedbytes
 
@@ -92,17 +97,10 @@ class Inode:
             # EC: now just None instead of a dict
             self.readkey = {} # zero out the dictionary just in case
             #    3b. fetch all the public keys for self.encryptfor (group or user)
+            # EC: group_key = secfs.principal.group_secret_key(self.write_as, self.encryptfor)
+            # EC: readkey = encrypt secret using group_key.
             if self.encryptfor.is_group():
                 secret = secfs.principal.group_secret_key(write_as, self.encryptfor)
-                secret = secfs.crypto.generate_ephemeral_key()
-                # EC: group_key = secfs.principal.group_secret_key(self.write_as, self.encryptfor)
-                # EC: readkey = encrypt secret using group_key.
-                users = secfs.principal.group_members(
-                        write_as, self.encryptfor)
-                for user in users:
-                    #    3c. encrypt the symmetric key with each of the public keys
-                    #    3d. store self.readkey, and return the symmetric key
-                    self.readkey[user] = secfs.crypto.encrypt(user, secret)
             else:
                 # TODO EC: readkey is not a map any more
                 self.readkey[write_as] = secfs.crypto.encrypt(write_as, secret)

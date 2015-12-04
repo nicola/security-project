@@ -33,8 +33,8 @@ class GroupMap:
             if not self.is_member(read_as, group):
                 raise PermissionError("User {} to read group secret key of group {} while not a member".format(read_as, group))
             enc_secret = self.perusermap[read_as][0][0]
-            print("Encrypted secret is:", enc_secret)
-            return secfs.crypto.decrypt(read_as, enc_secret)
+            dec_secret = secfs.crypto.decrypt(read_as, enc_secret);
+            return pickle.loads(dec_secret)
     def is_secret_group(self, read_as, group):
         # Returns true if the group is a secret group.
         # A secret group can own no world-readable files.
@@ -125,6 +125,7 @@ def default_users_and_groups():
     users = {u: secfs.crypto.generate_key(u) for u in uset}
 
     secret = secfs.crypto.generate_sym_key()
+    print ("FIRST GROUP SECRET:", secret)
     isSecret = False
     groups = {
         Group(100): {'data':[u for u in secfs.crypto.keys if u.id != 666], 
