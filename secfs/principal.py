@@ -5,32 +5,6 @@ from secfs.types import User, Group
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.hazmat.backends import default_backend
 
-# Brought over from fs.py.
-
-class UserMap:
-    """
-    Represents the contents of .users as an object that can
-    retrieve public keys for users.
-    """
-    def __init__(self, initmap=None):
-        self.keymap = initmap if initmap else {}
-    def public_key(self, user):
-        return self.keymap[user]
-    def set_public_key(self, user, key):
-        self.keymap[user] = key
-    def from_blob(blob):
-        plain_dict = json.loads(blob.decode('utf-8'))
-        public_key = {}
-        for u, pem in plain_dict.items():
-            public_key[User(int(u))] = load_pem_public_key(
-                pem.encode('utf-8'), backend=default_backend())
-        return UserMap(public_key)
-    def as_blob(self):
-        plain_dict = {
-            str(u.id): v.decode('utf-8') for u, v in self.keymap.items()
-        }
-        return json.dumps(plain_dict, indent=2).encode('utf-8')
-
 class GroupMap:
     """
     Represents the contents of .groups as an object that can answer
@@ -68,6 +42,30 @@ class GroupMap:
         plain_dict = {
             str(g.id): [u.id for u in lst]
                 for g, lst in self.membermap.items()
+        }
+        return json.dumps(plain_dict, indent=2).encode('utf-8')
+
+class UserMap:
+    """
+    Represents the contents of .users as an object that can
+    retrieve public keys for users.
+    """
+    def __init__(self, initmap=None):
+        self.keymap = initmap if initmap else {}
+    def public_key(self, user):
+        return self.keymap[user]
+    def set_public_key(self, user, key):
+        self.keymap[user] = key
+    def from_blob(blob):
+        plain_dict = json.loads(blob.decode('utf-8'))
+        public_key = {}
+        for u, pem in plain_dict.items():
+            public_key[User(int(u))] = load_pem_public_key(
+                pem.encode('utf-8'), backend=default_backend())
+        return UserMap(public_key)
+    def as_blob(self):
+        plain_dict = {
+            str(u.id): v.decode('utf-8') for u, v in self.keymap.items()
         }
         return json.dumps(plain_dict, indent=2).encode('utf-8')
 
