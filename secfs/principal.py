@@ -23,15 +23,32 @@ class GroupMap:
         # 1. Apply user's decryption key to check its group memberships
         if not self.exists(user, group):
             return False
-        return user in self.membermap[group]['data']
+        if self.is_secret_group(user, group):
+            for gp_object in self.perusermap[user]:
+                if gp_object[1]:
+                    gp_data = pickle.loads(secfs.crypto.decrypt_asym(user, gp_object[0]))
+                    print("GROUP DATA:", gp_data)
+                    if (gp_data[0] == group):
+                        return True
+        else:
+            print ("IS_MEMBER:", group in self.perusermap[user])
+            for gp_object in self.perusermap[user]:
+                if not gp_object[1]:
+                    if (gp_object[2] == group):
+                        return True
+        return False #user in self.membermap[group]['data']
     def secret_key(self, read_as, group):
         # Returns the group secret key, if allowed to access it.
         # read_as is the User asking the question.
+        if not self.is_member(read_as, group):
+            raise PermissionError("User {} to read group secret key of group {} while not a member".format(read_as, group))
         if self.is_secret_group(read_as, group):
-            return b''
+            enc_data = self.perusermap[read_as][0][0]
+            dec_data = pickle.loads(secfs.crypto.decrypt(read_as, enc_data))
+            secret_key = dec_data[1]
+            print("SECRET key:", secret_key)
+            return secret_key
         else:
-            if not self.is_member(read_as, group):
-                raise PermissionError("User {} to read group secret key of group {} while not a member".format(read_as, group))
             enc_secret = self.perusermap[read_as][0][0]
             dec_secret = secfs.crypto.decrypt(read_as, enc_secret);
             return pickle.loads(dec_secret)
@@ -41,7 +58,7 @@ class GroupMap:
         # read_as is the User asking the question.
         
         # Check if group is encrypted or not
-        return False
+        return self.membermap[group]['isSecret']
     def members(self, read_as, group):
         # Returns the members of the group, if allowed to see them.
         # read_as is the User asking the question.
