@@ -17,16 +17,13 @@ class GroupMap:
     def __init__(self, initmap=None, peruserinit=None):
         self.membermap = initmap if initmap else {}
         self.perusermap = peruserinit if peruserinit else {}
-        print("Initializing GroupMap:")
-        print("\tmembermap:", self.membermap)
-        print("\tperusermap:", self.perusermap)
         # EC: Change this to a map by users (maybe in addition
         # to a list of groups?)
     def is_member(self, user, group):
         # 1. Apply user's decryption key to check its group memberships
         if not self.exists(user, group):
             return False
-        return user in self.membermap[group]
+        return user in self.membermap[group]['data']
     def secret_key(self, read_as, group):
         # Returns the group secret key, if allowed to access it.
         # read_as is the User asking the question.
@@ -41,7 +38,7 @@ class GroupMap:
     def members(self, read_as, group):
         # Returns the members of the group, if allowed to see them.
         # read_as is the User asking the question.
-        return self.membermap[group]
+        return self.membermap[group]['data']
     def exists(self, read_as, group):
         # EC: see if the reader can tell that a given group exists.
         # read_as is the User asking the question, and it is OK
@@ -49,19 +46,10 @@ class GroupMap:
         return group in self.membermap
     def from_blob(blob):
         # Load the GroupMap from a file.
-        #plain_dict = json.loads(blob.decode('utf-8'))
-        #initmap = {}
-        #for g, lst in plain_dict.items():
-        #    initmap[Group(int(g))] = [User(id) for id in lst]
         membermap, perusermap =  pickle.loads(blob)
         return GroupMap(membermap, perusermap)
     def as_blob(self):
         # Save the GroupMap to a file.
-        print("Saving GroupMap to file...")
-        #plain_dict = {
-        #    str(g.id): [u.id for u in lst]
-        #        for g, lst in self.membermap.items()
-        #}
         return pickle.dumps((self.membermap, self.perusermap))
 
 class UserMap:
@@ -130,7 +118,7 @@ def default_users_and_groups():
     users = {u: secfs.crypto.generate_key(u) for u in uset}
 
     secret = secfs.crypto.generate_sym_key()
-    isSecret = True
+    isSecret = False
     groups = {
         Group(100): {'data':[u for u in secfs.crypto.keys if u.id != 666], 
                      'secret': secret,

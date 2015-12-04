@@ -115,7 +115,6 @@ server_mem "user-readable file" "supercalifragilisticexpialidocious"
 fstats "root-secret" "uid=root" "perm=-rw-------" || fail "encrypted file has incorrect permissions"
 cant "read encrypted file belonging to other user" "cat root-secret"
 expect "echo y | sudo tee -a root-secret" "sudo cat root-secret" '^supercalifragilisticexpialidocious\ny$' || fail "failed to append to encrypted file"
->>>>>>> 2e8e41c1800f8084a908c280a48e3c01b71ac036
 
 # Encrypted shared files (no read permission)
 expect "sudo sh -c 'umask 0204; echo dociousaliexpilisticfragicalirupes | sg users \"tee group-secret\"'" '^dociousaliexpilisticfragicalirupes$' || fail "couldn't create group-readable file as root"
