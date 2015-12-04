@@ -106,7 +106,7 @@ def default_users_and_groups():
     """
     users = {u: secfs.crypto.generate_key(u) for u in secfs.crypto.keys}
     groups = {Group(100): [u for u in secfs.crypto.keys if u.id != 666]}
-    return (users, groups)
+    return (UserMap(users), GroupMap(groups))
 
 def init_files(initusers, initgroups):
     """
@@ -114,8 +114,8 @@ def init_files(initusers, initgroups):
     GroupMap class, and serialize them here.
     """
     return {
-        b".users": UserMap(initusers).as_blob(),
-        b".groups": GroupMap(initgroups).as_blob()
+        b".users": initusers.as_blob(),
+        b".groups": initgroups.as_blob()
     }
 
 def reload():
