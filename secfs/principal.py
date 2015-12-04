@@ -124,13 +124,14 @@ def default_users_and_groups():
             [User(uid) for uid in range(1001, 1006)])
     users = {u: secfs.crypto.generate_key(u) for u in uset}
 
-    secret = secfs.crypto.generate_sym_key()
-    print ("FIRST GROUP SECRET:", secret)
     isSecret = False
     groups = {
         Group(100): {'data':[u for u in secfs.crypto.keys if u.id != 666], 
-                     'secret': secret,
-                     'isSecret':isSecret}
+                     'secret': secfs.crypto.generate_sym_key(),
+                     'isSecret':False},
+        Group(50): {'data':[User(1001), User(1002)],
+                     'secret': secfs.crypto.generate_sym_key(),
+                     'isSecret':True}
     }
 
     # Create per-user group list
@@ -149,12 +150,11 @@ def default_users_and_groups():
             else:
                 secret_info = pickle.dumps(lst['secret'])
                 per_user[u][-1] = (secfs.crypto.encrypt_asym(user_pk, secret_info), lst['isSecret'], g)
-    print("PER USER:", per_user)
 
     # Encrypt the secret groups
     for g, lst in groups.items():
         if lst['isSecret']:
-            lst['data'] = secfs.crypto.encrypt_sym(secret, pickle.dumps(lst['data']))
+            lst['data'] = secfs.crypto.encrypt_sym(lst['secret'], pickle.dumps(lst['data']))
 
     return (UserMap(users), GroupMap(groups, per_user))
 
