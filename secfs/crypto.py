@@ -59,6 +59,18 @@ def encrypt(user, data):
     )
     return ciphertext
 
+def encrypt_asym(public_key, data):
+    print ("encrypting with public key:", public_key)
+    ciphertext = public_key.encrypt(
+        data,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA1()),
+            algorithm=hashes.SHA1(),
+            label=None
+        )
+    )
+    return ciphertext
+
 def decrypt(user, ciphertext):
     private_key = keys[user]
     data = private_key.decrypt(
@@ -100,7 +112,11 @@ def encrypt_sym(key, data):
     f = Fernet(key)
     return f.encrypt(data)
 
+#TODO: remove this function
 def generate_ephemeral_key():
+    return Fernet.generate_key()
+
+def generate_sym_key():
     return Fernet.generate_key()
 
 def generate_key(user):

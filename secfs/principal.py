@@ -2,6 +2,8 @@ import json
 import secfs.fs
 import secfs.crypto
 import os.path
+import pickle
+import secfs.crypto
 from secfs.types import User, Group
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.hazmat.backends import default_backend
@@ -12,8 +14,12 @@ class GroupMap:
     questions about any group.  TODO: organize the .groups file
     in a different way.
     """
-    def __init__(self, initmap=None):
+    def __init__(self, initmap=None, peruserinit=None):
         self.membermap = initmap if initmap else {}
+        self.perusermap = peruserinit if peruserinit else {}
+        print("Initializing GroupMap:")
+        print("\tmembermap:", self.membermap)
+        print("\tperusermap:", self.perusermap)
         # EC: Change this to a map by users (maybe in addition
         # to a list of groups?)
     def is_member(self, user, group):
@@ -29,6 +35,8 @@ class GroupMap:
         # Returns true if the group is a secret group.
         # A secret group can own no world-readable files.
         # read_as is the User asking the question.
+        
+        # Check if group is encrypted or not
         return False
     def members(self, read_as, group):
         # Returns the members of the group, if allowed to see them.
@@ -41,18 +49,20 @@ class GroupMap:
         return group in self.membermap
     def from_blob(blob):
         # Load the GroupMap from a file.
-        plain_dict = json.loads(blob.decode('utf-8'))
-        initmap = {}
-        for g, lst in plain_dict.items():
-            initmap[Group(int(g))] = [User(id) for id in lst]
-        return GroupMap(initmap)
+        #plain_dict = json.loads(blob.decode('utf-8'))
+        #initmap = {}
+        #for g, lst in plain_dict.items():
+        #    initmap[Group(int(g))] = [User(id) for id in lst]
+        membermap, perusermap =  pickle.loads(blob)
+        return GroupMap(membermap, perusermap)
     def as_blob(self):
         # Save the GroupMap to a file.
-        plain_dict = {
-            str(g.id): [u.id for u in lst]
-                for g, lst in self.membermap.items()
-        }
-        return json.dumps(plain_dict, indent=2).encode('utf-8')
+        print("Saving GroupMap to file...")
+        #plain_dict = {
+        #    str(g.id): [u.id for u in lst]
+        #        for g, lst in self.membermap.items()
+        #}
+        return pickle.dumps((self.membermap, self.perusermap))
 
 class UserMap:
     """
@@ -62,6 +72,7 @@ class UserMap:
     def __init__(self, initmap=None):
         self.keymap = initmap if initmap else {}
     def public_key(self, user):
+        print ("getting user public key from map:", self.keymap)
         return self.keymap[user]
     def set_public_key(self, user, key):
         self.keymap[user] = key
@@ -117,10 +128,39 @@ def default_users_and_groups():
             list(secfs.crypto.keys.keys()) +
             [User(uid) for uid in range(1001, 1006)])
     users = {u: secfs.crypto.generate_key(u) for u in uset}
+
+    secret = secfs.crypto.generate_sym_key()
+    isSecret = True
     groups = {
-        Group(100): [u for u in secfs.crypto.keys if u.id != 666]
+        Group(100): {'data':[u for u in secfs.crypto.keys if u.id != 666], 
+                     'secret': secret,
+                     'isSecret':isSecret}
     }
-    return (UserMap(users), GroupMap(groups))
+
+    # Create per-user group list
+    per_user = {}
+    for g, lst in groups.items():
+        userlist = lst['data']
+        for u in userlist:
+            if u in per_user:
+                per_user[u].append[(g, lst['isSecret'])]
+            else:
+                per_user[u] = [(g, lst['isSecret'])]
+            user_pk = load_pem_public_key(users[u], backend=default_backend())
+            if lst['isSecret']:
+                gp_info = pickle.dumps((per_user[u][-1][0], lst['secret']))
+                per_user[u][-1] = (secfs.crypto.encrypt_asym(user_pk, gp_info), lst['isSecret'])
+            else:
+                secret_info = pickle.dumps(lst['secret'])
+                per_user[u][-1] = (secfs.crypto.encrypt_asym(user_pk, secret_info), lst['isSecret'], g)
+    print("PER USER:", per_user)
+
+    # Encrypt the secret groups
+    for g, lst in groups.items():
+        if lst['isSecret']:
+            lst['data'] = secfs.crypto.encrypt_sym(secret, pickle.dumps(lst['data']))
+
+    return (UserMap(users), GroupMap(groups, per_user))
 
 def init_files(initusers, initgroups):
     """
