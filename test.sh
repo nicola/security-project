@@ -107,7 +107,7 @@ fstats "shared/user-only" "uid=$user" "perm=drwxr-xr-x" || fail "new user dir ha
 fstats "shared/user-only/file" "uid=$user" "perm=-rw-r--r--" || fail "new nested user file has incorrect permissions"
 
 
-section "Restricted read permissions"
+ection "Restricted read permissions"
 # Encrypted files (no read permission)
 expect "sudo sh -c 'umask 0004; echo supercalifragilisticexpialidocious > root-secret'" '^$' || fail "couldn't create user-readable file as user"
 expect "sudo cat root-secret" '^supercalifragilisticexpialidocious$' || fail "couldn't read user-readable file as user"
@@ -115,17 +115,6 @@ server_mem "user-readable file" "supercalifragilisticexpialidocious"
 fstats "root-secret" "uid=root" "perm=-rw-------" || fail "encrypted file has incorrect permissions"
 cant "read encrypted file belonging to other user" "cat root-secret"
 expect "echo y | sudo tee -a root-secret" "sudo cat root-secret" '^supercalifragilisticexpialidocious\ny$' || fail "failed to append to encrypted file"
-
-# Rio's Special Test
-#section "Rio's Special Test"
-#expect "sudo sh -c 'umask 0204; echo no food for you. pushups. | sg staff \"tee staff-secret\"'" '^no food for you. pushups.$' || fail "couldn't create group-readable file as root"
-#server_mem "secret group-readable file" "no food for you. pushups."
-#fstats "staff-secret" "uid=root" "gid=staff" "perm=-r--rw----" || fail "secret group encrypted file has incorrect permissions"
-#expect "cat staff-secret" '^no food for you. pushups.$' || fail "couldn't read secret group-readable file as group member"
-#expect "sudo cat staff-secret" '^no food for you. pushups.$' || fail "couldn't read secret group-readable file as non-owning group member"
-#expect "echo z | sudo tee -a staff-secret" "sudo cat staff-secret" '^ diet.\nz$' || fail "failed to append to group encrypted file"
-#cant "read encrypted file belonging to secret group without being member" "sudo -u '#666' cat staff-secret"
-#cant "create world readable files as a secret group." "sudo sh -c 'umask 0200; echo fish | sg staff \"tee staff-secret\"'"
 
 # Encrypted shared files (no read permission)
 expect "sudo sh -c 'umask 0204; echo dociousaliexpilisticfragicalirupes | sg users \"tee group-secret\"'" '^dociousaliexpilisticfragicalirupes$' || fail "couldn't create group-readable file as root"
@@ -138,6 +127,17 @@ cant "read encrypted file belonging to group without being member" "sudo -u '#66
 # The test above should have done the following: (we need to mknod explicitly
 # because the automatic mknod doesn't seem to work here.)
 cant "read encrypted file belonging to group without being member" "sudo -u '#666' mknod x p 2> /dev/null; sudo -u '#666' cat group-secret"
+
+# Rio's Special Test
+#section "Rio's Special Test"
+#expect "sudo sh -c 'umask 0204; echo fish | sg staff \"tee staff-secret\"'" '^fish$' || fail "couldn't create secret group-readable file as root"
+#server_mem "secret group-readable file" "fish"
+#fstats "staff-secret" "uid=root" "gid=staff" "perm=-r--rw----" || fail "secret group encrypted file has incorrect permissions"
+#expect "cat staff-secret" '^fish$' || fail "couldn't read secret group-readable file as group member"
+#expect "sudo cat staff-secret" '^fish$' || fail "couldn't read secret group-readable file as non-owning group member"
+#expect "echo z | sudo tee -a staff-secret" "sudo cat staff-secret" '^ diet.\nz$' || fail "failed to append to group encrypted file"
+#cant "read encrypted file belonging to secret group without being member" "sudo -u '#666' cat staff-secret"
+#cant "create world readable files as a secret group." "sudo sh -c 'umask 0200; echo fish | sg staff \"tee staff-secret\"'"
 
 # Encrypted directories
 expect "sudo sh -c 'umask 0004; mkdir root-secrets'" '^$' || fail "couldn't create user-readable directory as user"

@@ -46,6 +46,7 @@ class Inode:
             #    1b. use my private key for decrypting the bulk key.
             # TODO: check if this throws an exception
             if self.encryptfor.is_group():
+                print("ENCRYPTED as a group")
                 if not secfs.principal.is_member(read_as, self.encryptfor):
                     raise PermissionError('User {} is not allowed to read file belonging to group {}'.format(read_as, self.encryptfor))
                 readkey = secfs.principal.group_secret_key(read_as, self.encryptfor)
@@ -74,6 +75,7 @@ class Inode:
     def write(self, write_as, filebytes):
         # Ex3:
         # 1. if self.encryptfor is None, just set the raw bytes.
+        savedbytes = b""
         if self.encryptfor is None:
             if not filebytes:
                 self.blocks = [] # Avoid extra operation for empty files.
@@ -106,7 +108,6 @@ class Inode:
                 self.readkey[write_as] = secfs.crypto.encrypt(write_as, secret)
             # 4. Bulk encrypt and store as self.blocks
             savedbytes = secfs.crypto.encrypt_sym(secret, filebytes)
-
         self.blocks = [secfs.store.block.store(savedbytes)]
 
     def bytes(self):

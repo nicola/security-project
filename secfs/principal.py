@@ -24,10 +24,9 @@ class GroupMap:
     # If found, returns (gp, gp_secret, isSecret)
     def find_group_object(self, user, group):
         if user not in self.perusermap.keys():
-            print("FAILED TO FIND USER")
             return None
         for gp_object in self.perusermap[user]:
-            gp_data = None
+            gp_data = {}
             if gp_object[1]:
                 gp, gp_secret = pickle.loads(secfs.crypto.decrypt(user, gp_object[0]))
                 gp_data = (gp, gp_secret, gp_object[1])
@@ -35,7 +34,7 @@ class GroupMap:
                 gp_secret = pickle.loads(secfs.crypto.decrypt(user, gp_object[0]))
                 gp_data = (gp_object[2], gp_secret, gp_object[1])
             if gp_data[0] == group:
-                return gp_object
+                return gp_data
         return None
     def is_member(self, user, group):
         # 1. Apply user's decryption key to check its group memberships
@@ -46,18 +45,20 @@ class GroupMap:
     def secret_key(self, read_as, group):
         # Returns the group secret key, if allowed to access it.
         # read_as is the User asking the question.
-        if not self.is_member(read_as, group):
+        gp_object = self.find_group_object(read_as, group)
+        if not gp_object:
             raise PermissionError("User {} to read group secret key of group {} while not a member".format(read_as, group))
-        if self.is_secret_group(read_as, group):
-            enc_data = self.perusermap[read_as][0][0]
-            dec_data = pickle.loads(secfs.crypto.decrypt(read_as, enc_data))
-            secret_key = dec_data[1]
-            print("SECRET key:", secret_key)
-            return secret_key
-        else:
-            enc_secret = self.perusermap[read_as][0][0]
-            dec_secret = secfs.crypto.decrypt(read_as, enc_secret);
-            return pickle.loads(dec_secret)
+        print("GROUP OBJECT:", gp_object)
+        return gp_object[1]
+        #if gp_object[1]:
+        #    enc_data = self.perusermap[read_as][0][0]
+        #    dec_data = pickle.loads(secfs.crypto.decrypt(read_as, enc_data))
+        #    secret_key = dec_data[1]
+        #    return secret_key[1]
+        #else:
+        #    enc_secret = self.perusermap[read_as][0][0]
+        #    dec_secret = secfs.crypto.decrypt(read_as, enc_secret);
+        #    return pickle.loads(dec_secret)
     def is_secret_group(self, read_as, group):
         # Returns true if the group is a secret group.
         # A secret group can own no world-readable files.
@@ -90,7 +91,6 @@ class UserMap:
     def __init__(self, initmap=None):
         self.keymap = initmap if initmap else {}
     def public_key(self, user):
-        print ("getting user public key from map:", self.keymap)
         return self.keymap[user]
     def set_public_key(self, user, key):
         self.keymap[user] = key
@@ -147,12 +147,11 @@ def default_users_and_groups():
             [User(uid) for uid in range(1001, 1006)])
     users = {u: secfs.crypto.generate_key(u) for u in uset}
 
-    isSecret = False
     groups = {
         Group(100): {'data':[u for u in secfs.crypto.keys if u.id != 666], 
                      'secret': secfs.crypto.generate_sym_key(),
                      'isSecret':False},
-        Group(50): {'data':[User(1001), User(1002)],
+        Group(50): {'data':[User(0), User(1001), User(1002)],
                      'secret': secfs.crypto.generate_sym_key(),
                      'isSecret':True}
     }
@@ -163,7 +162,7 @@ def default_users_and_groups():
         userlist = lst['data']
         for u in userlist:
             if u in per_user:
-                per_user[u].append[(g, lst['isSecret'])]
+                per_user[u].append((g, lst['isSecret']))
             else:
                 per_user[u] = [(g, lst['isSecret'])]
             user_pk = load_pem_public_key(users[u], backend=default_backend())
