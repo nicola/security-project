@@ -1,6 +1,7 @@
 import json
 import secfs.fs
 import secfs.crypto
+import os.path
 from secfs.types import User, Group
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from cryptography.hazmat.backends import default_backend
@@ -112,8 +113,13 @@ def default_users_and_groups():
     Used when creating a new filesystem.  Defines the users and groups
     objects that are later passed into init_files below.
     """
-    users = {u: secfs.crypto.generate_key(u) for u in secfs.crypto.keys}
-    groups = {Group(100): [u for u in secfs.crypto.keys if u.id != 666]}
+    uset = set(
+            list(secfs.crypto.keys.keys()) +
+            [User(uid) for uid in range(1001, 1006)])
+    users = {u: secfs.crypto.generate_key(u) for u in uset}
+    groups = {
+        Group(100): [u for u in secfs.crypto.keys if u.id != 666]
+    }
     return (UserMap(users), GroupMap(groups))
 
 def init_files(initusers, initgroups):
