@@ -96,8 +96,8 @@ class Inode:
             # TODO: the answer is NO, since when I create the file there are no readkeys!
             # TODO: Retrieve the users in the group
             if self.encryptfor.is_group():
-                # EC: groupsecret = secfs.groups.members(self.write_as)
-                # EC: readkey = encrypt secret using groupsecret.
+                # EC: group_key = secfs.principal.group_secret_key(self.write_as, self.encryptfor)
+                # EC: readkey = encrypt secret using group_key.
                 users = secfs.principal.group_members(
                         write_as, self.encryptfor)
                 for user in users:

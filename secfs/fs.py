@@ -93,9 +93,16 @@ def _create(parent_i, name, create_as, create_for, isdir, encrypt):
 
     assert create_as.is_user() # only users can create
     assert create_as == create_for or create_for.is_group() # create for yourself or for a group
-    # EC: groups.group_exists(create_for)
-    if create_for.is_group() and not secfs.principal.group_exists(create_for):
-        raise PermissionError("cannot create for unknown group {}".format(create_for))
+    if create_for.is_group():
+        if not secfs.principal.group_exists(create_as, create_for):
+            raise PermissionError(
+                    "cannot create for unknown group {}"
+                    .format(create_for))
+        if not encrypt and secfs.principal.is_secret_group(
+                create_as, create_for):
+            raise PermissionError(
+                    "cannot create public data for secret group {}"
+                    .format(create_for))
 
     # This check is performed by link() below, but better to fail fast
     if not secfs.access.can_write(create_as, parent_i):
