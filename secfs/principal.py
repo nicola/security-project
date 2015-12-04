@@ -21,24 +21,34 @@ class GroupMap:
             return False
         return user in self.membermap[group]
     def secret_key(self, read_as, group):
-        # Returns the group secret key, if allowed to access it
+        # Returns the group secret key, if allowed to access it.
+        # read_as is the User asking the question.
         return b''
     def is_secret_group(self, read_as, group):
         # Returns true if the group is a secret group.
         # A secret group can own no world-readable files.
+        # read_as is the User asking the question.
+        return b''
         return False
     def members(self, read_as, group):
+        # Returns the members of the group, if allowed to see them.
+        # read_as is the User asking the question.
+        return b''
         return self.membermap[group]
     def exists(self, read_as, group):
         # EC: see if the reader can tell that a given group exists.
+        # read_as is the User asking the question, and it is OK
+        # for people not in a secret group to get "False".
         return group in self.membermap
     def from_blob(blob):
+        # Load the GroupMap from a file.
         plain_dict = json.loads(blob.decode('utf-8'))
         initmap = {}
         for g, lst in plain_dict.items():
             initmap[Group(int(g))] = [User(id) for id in lst]
         return GroupMap(initmap)
     def as_blob(self):
+        # Save the GroupMap to a file.
         plain_dict = {
             str(g.id): [u.id for u in lst]
                 for g, lst in self.membermap.items()
