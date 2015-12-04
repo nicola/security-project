@@ -1,6 +1,7 @@
 import pickle
 import secfs.store.block
 import secfs.crypto
+import secfs.principal
 import uuid
 import os
 
@@ -97,7 +98,8 @@ class Inode:
             if self.encryptfor.is_group():
                 # EC: groupsecret = secfs.groups.members(self.write_as)
                 # EC: readkey = encrypt secret using groupsecret.
-                users = secfs.fs.groupmap[self.encryptfor]
+                users = secfs.principal.group_members(
+                        write_as, self.encryptfor)
                 for user in users:
                     #    3c. encrypt the symmetric key with each of the public keys
                     #    3d. store self.readkey, and return the symmetric key

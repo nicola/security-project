@@ -3,13 +3,51 @@ import secfs.fs
 import secfs.crypto
 from secfs.types import User, Group
 
+# Brought over from fs.py.
+
+# usermap contains a map from user ID to their public key according to /.users
+usermap = {}
+# groupmap contains a map from group ID to the list of members according to /.groups
+groupmap = {}
+
+
+def is_member(user, group):
+    if not group_exists(group):
+        return False
+    return user in groupmap[group]
+
+def group_members(read_by, group):
+    return groupmap[group]
+
+def group_exists(group):
+    print('Testing if group exists', group)
+    print('Groupmap is', groupmap)
+    return group in groupmap
+
+def user_public_key(user):
+    return usermap[user]
+
+def set_root_public_key(user, public_key):
+    """
+    Used when bootstrapping a filesystem, before anything is loaded
+    from the server.  We need a root identity who owns the root directory.
+    """
+    usermap[user] = public_key
+
 def default_users_and_groups():
+    """
+    Used when creating a new filesystem.  Defines the users and groups
+    objects that are later passed into init_files below.
+    """
     users = {u: secfs.crypto.generate_key(u) for u in secfs.crypto.keys}
     groups = {Group(100): [u for u in secfs.crypto.keys if u.id != 666]}
     return (users, groups)
 
-
 def init_files(users, groups):
+    """
+    Saves initial users and groups files.  TODO: Make a UserMap and
+    GroupMap class, and serialize them here.
+    """
     return {
         b".users": json.dumps(
                 {str(u.id): v.decode('utf-8')
@@ -24,6 +62,11 @@ def init_files(users, groups):
     }
 
 def reload():
+    """
+    Reloads users and groups files from the server.  TODO: Load into a
+    UserMap and GroupMap class.
+    """
+    global usermap, groupmap
     def _read_file(fname):
         """
         Simple helper function for reading the pickled contents of a SecFS file
@@ -40,16 +83,16 @@ def reload():
 
     # load group map
     # EC: just secfs.groups.clearknowledge()
-    secfs.fs.groupmap = {
+    groupmap = {
         Group(int(g)): [User(u) for u in v]
         for g, v in _read_file(b".groups").items()}
 
     # load user public key map (and decode their PEM-encoded public keys)
     from cryptography.hazmat.primitives.serialization import load_pem_public_key
     from cryptography.hazmat.backends import default_backend
-    secfs.fs.usermap = {}
+    usermap = {}
     for u, pem in _read_file(b".users").items():
-        secfs.fs.usermap[User(int(u))] = load_pem_public_key(
+        usermap[User(int(u))] = load_pem_public_key(
            pem.encode('utf-8'), backend=default_backend())
 
 # With anonymized groups, the metadata in the filesystem is now

@@ -12,11 +12,6 @@ from secfs.store.tree import Directory
 from cryptography.fernet import Fernet
 from secfs.types import I, Principal, User, Group
 
-# usermap contains a map from user ID to their public key according to /.users
-usermap = {}
-# groupmap contains a map from group ID to the list of members according to /.groups
-# EC: remove this.  no groupmap here any more.
-groupmap = {}
 # owner is the user principal that owns the current share
 owner = None
 # root_i is the i of the root of the current share
@@ -99,7 +94,7 @@ def _create(parent_i, name, create_as, create_for, isdir, encrypt):
     assert create_as.is_user() # only users can create
     assert create_as == create_for or create_for.is_group() # create for yourself or for a group
     # EC: groups.group_exists(create_for)
-    if create_for.is_group() and create_for not in groupmap:
+    if create_for.is_group() and not secfs.principal.group_exists(create_for):
         raise PermissionError("cannot create for unknown group {}".format(create_for))
 
     # This check is performed by link() below, but better to fail fast

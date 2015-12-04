@@ -243,7 +243,9 @@ class SecFS(llfuse.Operations):
             pem = f.read()
             secfs.fs.root_i = root
             secfs.fs.owner = root.p
-            secfs.fs.usermap[root.p] = load_pem_public_key(pem, backend=default_backend())
+            secfs.principal.set_root_public_key(
+                    root.p,
+                    load_pem_public_key(pem, backend=default_backend()))
 
         # Set up lastctx in case one of the non-context methods are called first
         global lastctx
@@ -566,7 +568,7 @@ class SecFS(llfuse.Operations):
 def _reload_principals():
     """
     Reloads the set of known principals by reading and parsing /.users and
-    /.groups, and the repopulating secfs.fs.usermap and secfs.fs.groupmap.
+    /.groups, and the repopulating principals data structures.
     """
 
     print("Entering _reload_principals")
