@@ -27,7 +27,14 @@ class GroupMap:
     def secret_key(self, read_as, group):
         # Returns the group secret key, if allowed to access it.
         # read_as is the User asking the question.
-        return b''
+        if self.is_secret_group(read_as, group):
+            return b''
+        else:
+            if not self.is_member(read_as, group):
+                raise PermissionError("User {} to read group secret key of group {} while not a member".format(read_as, group))
+            enc_secret = self.perusermap[read_as][0][0]
+            print("Encrypted secret is:", enc_secret)
+            return secfs.crypto.decrypt(read_as, enc_secret)
     def is_secret_group(self, read_as, group):
         # Returns true if the group is a secret group.
         # A secret group can own no world-readable files.
@@ -95,7 +102,7 @@ def is_secret_group(read_as, group):
     return groupmap.is_secret_group(read_as, group)
 
 def group_secret_key(read_as, group):
-    return groupmap.group_secret_key(read_as, group)
+    return groupmap.secret_key(read_as, group)
 
 def user_public_key(user):
     return usermap.public_key(user)
