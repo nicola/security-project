@@ -11,6 +11,14 @@ def can_read(user, i):
     if can_write(user, i):
         return True
 
+    # EC: when the file is owned by a secret group, we need to do a bit
+    # of additional logic to verify that we are readin an uncorrupted
+    # file that was written only by a member of the group.
+    if i.p.is_group() and secfs.principal.is_secret_group(user, i.p):
+        useri = secfs.tables.resolve(i, resolve_groups=False)
+        # TODO: uncomment this line.
+        # assert useri in secfs.principal.group_members(user, i.p)
+
     # Some files are world-readable.  We need the inode to know that.
     n = secfs.fs.get_inode(i)
     # Ex3-note: encryptfor is None if the file is world-readble.

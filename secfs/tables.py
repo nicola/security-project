@@ -129,12 +129,13 @@ class VersionStructureList:
             # we do not do this check if we have not yet downloaded
             # the groupmap; that is done after reloading principals
             # TODO: fix this up.
-            if False and p.is_group() and not skip_group_check:
-                if p not in secfs.fs.groupmap:
+            if p.is_group() and not skip_group_check:
+                if not secfs.principal.group_exists(verify_as, p):
                     raise PermissionError(("User {} signed an illegal VS " +
                         "with unknown group {}").format(user, p))
-                if user not in secfs.fs.groupmap[p]:
-                     raise PermissionError(("User {} signed an illegal VS " +
+                if (not secfs.principal.is_secret_group(verify_as, p) and
+                      user not in secfs.principal.group_members(verify_as, p)):
+                    raise PermissionError(("User {} signed an illegal VS " +
                         "- not a member of group {}").format(user, p))
             # 4. Latest itable hashes (current_ihandles) are updated.
             if self.current_versions.get(p, -1) < vs.version_vector[p] and \
