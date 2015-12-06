@@ -129,15 +129,15 @@ cant "read encrypted file belonging to group without being member" "sudo -u '#66
 cant "read encrypted file belonging to group without being member" "sudo -u '#666' mknod x p 2> /dev/null; sudo -u '#666' cat group-secret"
 
 # Rio's Special Test
-#section "Rio's Special Test"
-#expect "sudo sh -c 'umask 0204; echo fish | sg staff \"tee staff-secret\"'" '^fish$' || fail "couldn't create secret group-readable file as root"
-#server_mem "secret group-readable file" "fish"
-#fstats "staff-secret" "uid=root" "gid=staff" "perm=-r--rw----" || fail "secret group encrypted file has incorrect permissions"
-#expect "cat staff-secret" '^fish$' || fail "couldn't read secret group-readable file as group member"
-#expect "sudo cat staff-secret" '^fish$' || fail "couldn't read secret group-readable file as non-owning group member"
-#expect "echo z | sudo tee -a staff-secret" "sudo cat staff-secret" '^ diet.\nz$' || fail "failed to append to group encrypted file"
-#cant "read encrypted file belonging to secret group without being member" "sudo -u '#666' cat staff-secret"
-#cant "create world readable files as a secret group." "sudo sh -c 'umask 0200; echo fish | sg staff \"tee staff-secret\"'"
+section "Rio's Special Test"
+expect "sudo sh -c 'umask 0204; echo fishyfishyfish | sg staff \"tee staff-secret\"'" '^fishyfishyfish$' || fail "couldn't create secret group-readable file as root"
+server_mem "secret group-readable file" "fishyfishyfish"
+fstats "staff-secret" "uid=root" "gid=staff" "perm=-r--rw----" || fail "secret group encrypted file has incorrect permissions"
+expect "cat staff-secret" '^fishy$' || fail "couldn't read secret group-readable file as group member"
+expect "sudo cat staff-secret" '^fishyfishyfish$' || fail "couldn't read secret group-readable file as non-owning group member"
+expect "echo z | sudo tee -a staff-secret" "sudo cat staff-secret" '^ diet.\nz$' || fail "failed to append to group encrypted file"
+cant "read encrypted file belonging to secret group without being member" "sudo -u '#666' cat staff-secret"
+cant "create world readable files as a secret group." "sudo sh -c 'umask 0200; echo readme | sg staff \"tee staff-secret\"'"
 
 # Encrypted directories
 expect "sudo sh -c 'umask 0004; mkdir root-secrets'" '^$' || fail "couldn't create user-readable directory as user"
