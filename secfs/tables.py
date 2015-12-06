@@ -9,6 +9,7 @@ import secfs.store
 import secfs.fs
 from secfs.types import I, Principal, User, Group
 import secfs.crypto as crypto
+from collections import OrderedDict
 
 # vsl represents the current view of the file system's VSL
 
@@ -212,16 +213,12 @@ def post(push_vs):
 # Ex1: review.  This is an easy-to-pickle type that just has two maps.
 class VersionStructure:
     def __init__(self):
-        self.ihandles = {
-                # map Principal -> itable hashes
-        }
-        self.version_vector = {
-                # map Principal -> integer versions
-        }
-        # TODO: owner user?  signature?
-        self.signature = {
-               # signature
-        }
+        # map Principal -> itable hashes
+        self.ihandles = OrderedDict()
+        # map Principal -> integer versions
+        self.version_vector = OrderedDict()
+        # signature
+        self.signature = None
 
     def from_bytes(b):
         # the RPC layer will base64 encode binary data
@@ -241,9 +238,11 @@ class VersionStructure:
     def sign(self, user):
         # updates the signature part of the vs
         self.signature = crypto.sign(self.payload_bytes(), user)
+        # print("Signing VS for {}.  VS has {}".format(user, self.__dict__))
 
     def verify(self, user):
         # verifies a signature
+        # print("Verifying VS for {}.  VS has {}".format(user, self.__dict__))
         return crypto.verify(self.payload_bytes(), self.signature, user)
 
 class Itable:
