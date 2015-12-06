@@ -107,7 +107,7 @@ class VersionStructureList:
         # 2. After upload version_delta is emptied.
         self.version_delta.clear()
 
-    def apply_and_check_vs(self, uid, vs, skip_group_check=False):
+    def apply_and_check_vs(self, uid, vs, verify_as, skip_group_check=False):
         # If the are are no version structures, we apply the root one and
         # just rollback if things look bad
         print("In apply_and_check_vs, uid is", uid,
@@ -148,7 +148,7 @@ class VersionStructureList:
         # verify that the version is actually newer.
         self.version_structures[user] = vs
 
-    def download(self, refresh):
+    def download(self, refresh, verify_as):
         # Ex1: refresh the VSL based on the latest from the server.
         # 1. Call the new server RPC "downloadVSL".
         user_versions = {
@@ -165,7 +165,7 @@ class VersionStructureList:
             vs.verify(User(0))
             # We must skip the group check, because we have not yet
             # downloaded the groups information.
-            self.apply_and_check_vs(0, vs, skip_group_check=True)
+            self.apply_and_check_vs(0, vs, verify_as, skip_group_check=True)
 
         # refresh usermap and groupmap
         if refresh:
@@ -184,7 +184,7 @@ class VersionStructureList:
             # Note that uid 0 is re-applied-and-checked, because we need
             # to check things with the skip_group_check flag set.
             vs = VersionStructure.from_bytes(vsbytes)
-            self.apply_and_check_vs(uid, vs)
+            self.apply_and_check_vs(uid, vs, verify_as)
 
 # Ex1: this is the singleton client cache
 vsl = VersionStructureList()
@@ -201,7 +201,7 @@ def pre(refresh, user):
     an exclusive server lock.
     """
     # Ex1: download updates to the VSL before doing operations
-    vsl.download(refresh)
+    vsl.download(refresh, user)
 
 def post(push_vs):
     if not push_vs:
