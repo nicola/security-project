@@ -67,9 +67,16 @@ class GroupMap:
         # Check if group is encrypted or not
         return self.membermap[group]['isSecret']
     def members(self, read_as, group):
-        # Returns the members of the group, if allowed to see them.
-        # read_as is the User asking the question.
-        return self.membermap[group]['data']
+        # If it is not a secret group, then 'data' contains the list of
+        # members, unencrypted.
+        if not self.membermap[group]['isSecret']:
+            return self.membermap[group]['data']
+        # If it is a secret group, we need to use the group secret key
+        # to decrypt the group members
+        key = self.secret_key(read_as, group)
+        bts = secfs.crypto.decrypt_sym(key, self.membermap[group]['data'])
+        return pickle.loads(bts)
+
     def exists(self, read_as, group):
         # EC: see if the reader can tell that a given group exists.
         # read_as is the User asking the question, and it is OK

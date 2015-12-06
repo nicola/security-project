@@ -16,8 +16,7 @@ def can_read(user, i):
     # file that was written only by a member of the group.
     if i.p.is_group() and secfs.principal.is_secret_group(user, i.p):
         useri = secfs.tables.resolve(i, resolve_groups=False)
-        # TODO: uncomment this line.
-        # assert useri in secfs.principal.group_members(user, i.p)
+        assert useri in secfs.principal.group_members(user, i.p)
 
     # Some files are world-readable.  We need the inode to know that.
     n = secfs.fs.get_inode(i)
