@@ -156,11 +156,16 @@ def default_users_and_groups():
 
     groups = {
         Group(100): {'data':[u for u in secfs.crypto.keys if u.id != 666], 
-                     'secret': secfs.crypto.generate_sym_key(),
                      'isSecret':False},
         Group(50): {'data':[User(0), User(1001), User(1002)],
-                     'secret': secfs.crypto.generate_sym_key(),
                      'isSecret':True}
+    }
+
+    # These secrets are NOT stored in the .groups file in the clear.
+    # They are only stored in encrypted form.
+    group_secret = {
+        Group(100): secfs.crypto.generate_sym_key(),
+        Group(50): secfs.crypto.generate_sym_key()
     }
 
     # Create per-user group list
@@ -174,16 +179,17 @@ def default_users_and_groups():
                 per_user[u] = [(g, lst['isSecret'])]
             user_pk = load_pem_public_key(users[u], backend=default_backend())
             if lst['isSecret']:
-                gp_info = pickle.dumps((per_user[u][-1][0], lst['secret']))
+                gp_info = pickle.dumps((per_user[u][-1][0], group_secret[g]))
                 per_user[u][-1] = (secfs.crypto.encrypt_asym(user_pk, gp_info), lst['isSecret'])
             else:
-                secret_info = pickle.dumps(lst['secret'])
+                secret_info = pickle.dumps(group_secret[g])
                 per_user[u][-1] = (secfs.crypto.encrypt_asym(user_pk, secret_info), lst['isSecret'], g)
 
     # Encrypt the secret groups
     for g, lst in groups.items():
         if lst['isSecret']:
-            lst['data'] = secfs.crypto.encrypt_sym(lst['secret'], pickle.dumps(lst['data']))
+            lst['data'] = secfs.crypto.encrypt_sym(
+                    group_secret[g], pickle.dumps(lst['data']))
 
     return (UserMap(users), GroupMap(groups, per_user))
 
