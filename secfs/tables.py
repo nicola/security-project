@@ -57,8 +57,6 @@ class VersionStructureList:
 
         # 2. the itable gets saved to the server and hashed.
         new_hash = secfs.store.block.store(itable.bytes())
-        # TODO: do we really want to trust the server hash?
-        # BUG: If the server is adversarial, we should only trust our own hash.
 
         # 3. current_versions get increments for update_as and update_for
         # and version_delta is update to note changes
@@ -107,7 +105,7 @@ class VersionStructureList:
         # 2. After upload version_delta is emptied.
         self.version_delta.clear()
 
-    def apply_and_check_vs(self, uid, vs):
+    def apply_and_check_vs(self, uid, vs, skip_group_check=False):
         # If the are are no version structures, we apply the root one and
         # just rollback if things look bad
         print("In apply_and_check_vs, uid is", uid,
@@ -117,12 +115,24 @@ class VersionStructureList:
             previous_versions = self.version_structures[user].version_vector
             VersionStructureList.check_versions(
                 previous_versions, vs.version_vector)
-        # verify that the version is actually newer.
-        self.version_structures[User(uid)] = vs
         print("Downloaded VersionStructure for user {}".format(uid))
         print("version_vector={}".format(vs.version_vector))
         print("ihandles={}".format(vs.ihandles))
         for p, ihandle in vs.ihandles.items():
+            # verify that the version structure only has user ihandles for self
+            if p.is_user() and p != user:
+                raise PermissionError(("User {} signed an illegal VS with " +
+                        "an ihandle for user {}").format(user, p))
+            # verify that it only has group handles when it has membership
+            # we do not do this check if we have not yet downloaded
+            # the groupmap; that is done after reloading principals
+            if p.is_group() and not skip_group_check:
+                if p not in secfs.fs.groupmap:
+                    raise PermissionError(("User {} signed an illegal VS " +
+                        "with unknown group {}").format(user, p))
+                if user not in secfs.fs.groupmap[p]:
+                     raise PermissionError(("User {} signed an illegal VS " +
+                        "- not a member of group {}").format(user, p))
             # 4. Latest itable hashes (current_ihandles) are updated.
             if self.current_versions.get(p, -1) < vs.version_vector[p] and \
                     ihandle != self.current_ihandles.get(p, None):
@@ -132,6 +142,8 @@ class VersionStructureList:
                 # delete the old itable from current_itables.
                 if p in self.current_itables:
                     del self.current_itables[p]
+        # verify that the version is actually newer.
+        self.version_structures[user] = vs
 
     def download(self, refresh):
         # Ex1: refresh the VSL based on the latest from the server.
@@ -148,7 +160,9 @@ class VersionStructureList:
             vsbytes = changed_vsl[0]
             vs = VersionStructure.from_bytes(vsbytes)
             vs.verify(User(0))
-            self.apply_and_check_vs(0, vs)
+            # We must skip the group check, because we have not yet
+            # downloaded the groups information.
+            self.apply_and_check_vs(0, vs, skip_group_check=True)
 
         # refresh usermap and groupmap
         if refresh:
@@ -164,9 +178,10 @@ class VersionStructureList:
         # 3. After download, set current_versions to the latest
         # version numbers in each VSL.
         for uid, vsbytes in changed_vsl.items():
-            if uid != 0:
-                 vs = VersionStructure.from_bytes(vsbytes)
-                 self.apply_and_check_vs(uid, vs)
+            # Note that uid 0 is re-applied-and-checked, because we need
+            # to check things with the skip_group_check flag set.
+            vs = VersionStructure.from_bytes(vsbytes)
+            self.apply_and_check_vs(uid, vs)
 
 # Ex1: this is the singleton client cache
 vsl = VersionStructureList()
