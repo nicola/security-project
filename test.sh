@@ -36,7 +36,9 @@ uri=$(grep "uri = PYRO:secfs" server.log | awk '{print $3}')
 # start primary client and connect it to the server
 info "connecting to server at %s" "$uri"
 sudo rm -f root.pub user-*-key.pem
-client
+
+# Also load user 1001's private key, for testing secret groups.
+client "root.pub" "user-0-key.pem" "user-$(id -u)-key.pem" "user-1001-key.pem"
 
 section "Initializtion"
 expect "ls -la" ' *\.\/?$' || fail "root directory does not contain ."
@@ -130,14 +132,16 @@ cant "read encrypted file belonging to group without being member" "sudo -u '#66
 
 # Rio's Special Test
 section "Rio's Special Test"
+# pushc "secret-client-with-root"
+# client "root.pub" "user-0-key.pem" "user-$(id -u)-key.pem" "user-1001-key.pem"
 expect "sudo sh -c 'umask 0204; echo fishyfishyfish | sg staff \"tee staff-secret\"'" '^fishyfishyfish$' || fail "couldn't create secret group-readable file as root"
 server_mem "secret group-readable file" "fishyfishyfish"
 fstats "staff-secret" "uid=root" "gid=staff" "perm=-r--rw----" || fail "secret group encrypted file has incorrect permissions"
-expect "cat staff-secret" '^fishy$' || fail "couldn't read secret group-readable file as group member"
+expect "sudo -u '#1001' mknod x p 2> /dev/null; sudo -u '#1001' cat staff-secret" '^fishyfishyfish$' || fail "couldn't read secret group-readable file as group member"
 expect "sudo cat staff-secret" '^fishyfishyfish$' || fail "couldn't read secret group-readable file as non-owning group member"
-expect "echo z | sudo tee -a staff-secret" "sudo cat staff-secret" '^ diet.\nz$' || fail "failed to append to group encrypted file"
+expect "echo z | sudo tee -a staff-secret" "sudo cat staff-secret" '^fishyfishyfish\nz$' || fail "failed to append to group encrypted file"
 cant "read encrypted file belonging to secret group without being member" "sudo -u '#666' cat staff-secret"
-cant "create world readable files as a secret group." "sudo sh -c 'umask 0200; echo readme | sg staff \"tee staff-secret\"'"
+cant "create world readable files as a secret group." "sudo sh -c 'umask 0200; echo readme | sg staff \"tee staff-news\"'"
 
 # Encrypted directories
 expect "sudo sh -c 'umask 0004; mkdir root-secrets'" '^$' || fail "couldn't create user-readable directory as user"
