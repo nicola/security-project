@@ -26,6 +26,12 @@ class User(Principal):
         return isinstance(other, User) and self._uid == other._uid
     def __str__(self):
         return "<uid={}>".format(self._uid)
+    def __repr__(self):
+        return "User({})".format(self._uid)
+    def __lt__(self, other):
+        if not other.is_user():
+            return True
+        return self._uid < other._uid
     def __hash__(self):
         return hash(self._uid)
 
@@ -48,6 +54,12 @@ class Group(Principal):
         return isinstance(other, Group) and self._gid == other._gid
     def __str__(self):
         return "<gid={}>".format(self._gid)
+    def __repr__(self):
+        return "Group({})".format(self._gid)
+    def __lt__(self, other):
+        if not other.is_group():
+            return False
+        return self._gid < other._gid
     def __hash__(self):
         return hash(self._gid)
 
